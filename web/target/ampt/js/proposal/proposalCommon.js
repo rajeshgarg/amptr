@@ -1,0 +1,756 @@
+/**
+ * @author amandeep.singh
+ */
+var resourceBundle;
+
+$(document).ready(function () {
+	
+	if ($("#basicInfoParentDiv #id").val() != '0') {
+		$("#proposalNameInHeader","#header").text($("#proposalName","#propoalDetails").val());
+	}else{
+		$("#proposalNameInHeader","#header").text("New Proposal");
+	}
+
+	$('#close-button').click(function() {
+		if (window.opener == null) {//For Proposal opened through copied URL
+			var ajaxReq = new AjaxRequest();
+			$('body').unbind('ajaxComplete');
+			ajaxReq.url = "./j_spring_security_logout";
+			ajaxReq.dataType = 'html';
+			ajaxReq.success = function( result, status, xhr ){
+				var url =  $("#contextPath").val() + "/loginpage.action";
+				window.open(url, "_self");		
+			};
+			ajaxReq.error = function(xhr, status, result){
+				var url =  $("#contextPath").val() + "/loginpage.action";
+				window.open(url, "_self");		
+			};
+			ajaxReq.submit();		
+		}
+		window.close();
+	});
+
+	/**
+	 * Show session time out model dialog
+	 * 
+	 * @param {Object}     event
+	 * @param {Object}     request
+	 * @param {Object}     settings
+	 */
+	$('body').bind('ajaxComplete', function(event, request, settings){
+	    if (request.getResponseHeader('REQUIRES_AUTH') === '1'){
+	    	$("#sessionTimeout").dialog( "open" );
+	    }
+	});
+	
+	$('body').bind('ajaxStart', function(event, request, settings){
+	    showLoader();
+	});
+	
+	$('body').bind('ajaxStop', function(event, request, settings){
+	    hideLoader();
+	});
+	
+	$( "#sessionTimeout").dialog({
+		autoOpen: false,
+		height: 135,
+		width: 400,
+		modal: true,
+		resizable: false,
+		buttons: {
+			Ok: function() {
+				$( this ).dialog( "close" );
+				window.location.reload();
+			}
+		},
+		close: function(event, ui) {
+			window.location.reload();
+		}
+	});
+	
+	$(".numeric").live("focus", function() {
+		$(this).val($(this).val().replace(/,/g, ''));
+	}).live("focusout", function() {
+		if(parseFloat($(this).val(), 10) == 0) {
+			$(this).val(0);
+		}
+		$(this).val(formatNumber($(this).val()));
+	});
+	
+	$(".numericdecimal").live("focus", function() {
+		$(this).val($(this).val().replace(/,/g, ''));
+	}).live("focusout", function() {
+		if(parseFloat($(this).val(), 10) == 0) {
+			$(this).val(0);
+		}
+		$(this).val(formatDecimal($(this).val()));
+	});
+});
+
+/**
+ * Initialised resource bundle and store in java script
+ */
+function initalizeResourceBundle(){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./homepage/initResourceBundle.action";
+	ajaxReq.success = function(result, status, xhr) {
+		/**
+		 * Setting a Global array variable named "resourceBunldle" to access
+		 * constants which is defined in messages.properties 
+		 */
+		resourceBundle = result;
+		initBasicInfo();
+	};
+	ajaxReq.submit();
+}
+
+/**
+ * 
+ * @param {Object} urlPart
+ * @param {Object} stateId
+ * @param {Object} renderFragmentIdentifier
+ */
+function stateChangeRequest(urlPart, stateId){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = urlPart + "&_eventId=" + stateId;
+	ajaxReq.dataType = 'html';
+	ajaxReq.cache = true;
+	ajaxReq.success = function(result, status, xhr) {
+		$("#proposalOuterContainer").empty().append(result);
+	};
+	ajaxReq.submit();
+}
+
+/**
+ * Function used to load a Option
+ * @param {Object} proposalId
+ * @param {Object} optionID
+ */
+function loadOption(flowurl, event, proposalId, optionId){
+	stateChangeRequest(flowurl, event + "&proposalOption="+optionId);
+}
+
+/**
+ * Base class for all JQGrid 
+ */
+function proposalJqGridBaseOptions () {
+	this.datatype = 'json';
+	this.contentType = 'application/json; charset=utf-8';
+	this.height = 225;
+	this.rowNum = 10;
+	this.scrollrows = true;
+	this.autowidth = true;
+	this.emptyrecords = resourceBundle['label.generic.emptymessage'];
+	this.forceFit = false;
+	this.closeAfterAdd = true;
+	this.rowList = [10,15,20];
+	this.scrollOffset = 0;
+	this.viewrecords = true;
+	this.altRows = true;
+	this.loadui = 'disable';
+	this.sortorder = 'desc';
+	this.altclass = 'even_Table_Row';
+	this.jsonReader = new JsonReader();
+	this.gridComplete = function () {
+		var topRowId = $(this).getDataIDs()[0];
+		if(topRowId != ''){
+			jQuery(this).setSelection(topRowId, true);
+		}
+		if (jQuery(this).hasClass("childGridForBuildProposalLineItem")){
+			jQuery(this).setGridWidth($("#lineItemSpan").width() - 20, true);
+		} else if (jQuery(this).hasClass("secondChildGrid")){
+			jQuery(this).setGridWidth($("#buildProposalTab").width() - 50, true);
+		} else if (jQuery(this).hasClass("optionsGrid")){
+			jQuery(this).setGridWidth($("#proposalOptionSpan").width() - 20, true);
+		} else {
+			jQuery(this).setGridWidth($(".proposal-inner-container").width() - 10, true);
+		}
+		this.p.afterGridCompleteFunction();
+	};
+	this.afterGridCompleteFunction = function (){
+		/*
+		 * Optional: In case of implementation, 
+		 * user will responsible for calling in as last statement of gridComplete function of JQgrid.
+		 */
+	};
+	this. loadError = function(xhr, st, str){
+		if (xhr.getResponseHeader('REQUIRES_AUTH') === '1') {
+		
+		}
+		else {
+			handelIntegrationExceptionOnServer(xhr, this);
+		}
+	};
+	this.handleDeleteError = handelIntegrationExceptionOnServer;
+};
+
+/**
+ * Initialised attachment JQgrid options
+ * 
+ * @param {Object} rootDiv
+ */
+function initProposalAttachementGridOpts(rootDiv) {
+	var attachementGridOpts = new JqGridBaseOptions();
+	attachementGridOpts.colNames = ['Id', 'Document Name',' Purpose', 'Document Type', 'Size (KB)', 'Document Version', 'Modified By', 'Modified On', 'Action'];
+	attachementGridOpts.colModel = [
+      	{name:'id',index:'id', sortable:true, hidden:true, key:true, hidedlg:true},
+		{name:'fileName',index:'fileName', sortable:true, width:200},
+		{name:'description',index:'description', sortable:false, width:200},
+		{name:'fileType',index:'fileType',sortable:true},
+		{name:'fileSize',index:'fileSize', sortable:true, width:75, align:"right"},
+		{name:'downloadString',index:'downloadString', sortable:false, hidedlg:true},
+		{name:'modifiedBy',index:'modifiedBy', sortable:true},
+		{name:'modifiedOn',index:'modifiedOn', sortable:true, width:100},
+		{name:'add',index:'add', sortable:false, width:80, align:'center'},
+	];
+	attachementGridOpts.gridComplete = function() {
+		setGridAlternateStyle(this);
+		var ids = jQuery("#"+rootDiv+"Table").jqGrid('getDataIDs');
+		for(var i = 0;i < ids.length; i++){
+			var cl = ids[i];						
+			be = "<a style=\"cursor:pointer;\" onClick=\"jQuery('#"+rootDiv+"Form #id').val('"+cl+"'); jQuery('#"+rootDiv+"Table').setSelection("+cl+", true);clearCSSErrors('#"+rootDiv+"Form');	jQuery('#"+rootDiv+"Dialog').dialog('open');\">Update Version</a>"; 
+			jQuery("#"+rootDiv+"Table").jqGrid('setRowData',ids[i],{add:be});
+		}
+		var topRowId = $(this).getDataIDs()[0];
+		if(topRowId != ''){
+			jQuery(this).setSelection(topRowId, true);
+		}
+		
+		$(this).setGridWidth($("#uploadDocumentSpan").width() - 20, true);
+		
+		attachementGridOpts.afterGridCompleteFunction();
+	};
+	attachementGridOpts.pager = jQuery("#"+rootDiv+"Pager"),
+	attachementGridOpts.height = 113,
+	attachementGridOpts.sortname = 'id';
+	return attachementGridOpts;
+}
+
+
+function assignToUser(urlPart, stateId, proposalId, ownerName){
+	var errorObj = ''; 
+	if (ownerName == '') {
+		errorObj = resourceBundle['message.confirm.user.unassign'] + ". Do you want to assign it?"; 
+	} else {
+		errorObj = resourceBundle['message.confirm.user.assign']+" "+ ownerName+". Do you want to reassign it?";
+	} 
+	var arr = [urlPart, stateId, proposalId];
+	new ModalDialogConfirm(errorObj,arr, assignUser);
+}
+
+function assignUser(arr){
+		var ajaxSubReq = new AjaxRequest();
+		ajaxSubReq.url = "./proposalWorkflow/updateAssignToUser.action?proposalId="+arr[2]+"&userId="+$("#assignTo","#propHeader").val();
+		ajaxSubReq.success = function(result, status, xhr){
+			jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.proposalUserUpdated']});
+			stateChangeRequest(arr[0], arr[1]);
+		};
+		ajaxSubReq.submit();
+}
+
+
+function createVersionConfirmationDialog(urlPart, stateId, proposalId, optionId){
+	var errorObj = resourceBundle['confirm.create.new.version']; 
+	var arr = [urlPart, stateId, proposalId, optionId];
+	new ModalDialogConfirm(errorObj,arr,createNewVersion);
+}
+
+function createNewVersion(arr){
+	var urlPart = arr[0];
+	var stateId = arr[1]; 
+	var proposalID = arr[2];
+	var optionID = arr[3];
+	var proposalVersion = $("#currentVersion","#optionStatusContainer").val();
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./proposalWorkflow/createVersion.action?id=" + proposalID + "&proposalVersion=" + proposalVersion + "&optionId=" + optionID;
+	ajaxReq.success = function(result, status, xhr) {
+		jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.proposal.version.created']});
+		if($.trim($("#proposalStatusHeader").text()) == 'In Progress'){
+			stateId = 'eventCreateNewVersionBasic';
+		}
+	    stateChangeRequest(urlPart, stateId);
+	};
+	ajaxReq.submit();
+}
+
+function showPreviousRevision(flowurl, event, proposalId, optionId){
+	var proposalVersion = $("#currentVersion","#optionStatusContainer").val();
+	stateChangeRequest(flowurl, event + "&proposalVersion="+proposalVersion+"&proposalId="+proposalId);
+}
+
+function copyUrl(proposalID) {
+	var url = '';
+	var applicationUrl = $("#applicationURL").val();
+	if(	applicationUrl.slice(-1) == "/") {
+		url = applicationUrl + "manageProposal.action?_flowId=workOnProposal&proposalId=" + proposalID;
+	} else {
+		url = applicationUrl + "/manageProposal.action?_flowId=workOnProposal&proposalId=" + proposalID;
+	}
+	 $("#copyUrl").qtip({
+	        content: {
+	            text: url,	        	
+	            title: {
+	                text: 'Copy URL', // Give the tool tip a title using each elements text
+	                button: true
+	            }
+	        },
+	        position: {
+	            at: 'top center', // Position the tool tip above the link
+	            my: 'bottom center',
+	            viewport: $(window), // Keep the tool tip on-screen at all times
+	            effect: false // Disable positioning animation
+	        },
+	        show: {
+	            event: 'click',
+	            ready: true // Only show one tool tip at a time
+	        },
+	        hide: 'unfocus',
+	        style: {
+	            classes: 'ui-tooltip-custom ui-tooltip-tipped copy-url-content',
+	            width: '600'
+	        }
+	    });
+ }
+ 
+ function updateProposalStatus(urlPart, stateId, proposalID, proposalStatus, confirmMsg, successMsg){
+	 var version = $("#propVersionStaleObject").val();
+ 	var arr = [urlPart, stateId, proposalID, proposalStatus, successMsg, version];
+ 	var currentStatus = $.trim($("#proposalStatusHeader","#propHeader").text());
+	var ajaxPricingReq = new AjaxRequest();
+	ajaxPricingReq.url = "./proposalWorkflow/checkPricingStatus.action?id=" + arr[2] + "&proposalStatus=" + arr[3] + "&version=" + arr[5] ;
+	ajaxPricingReq.success = function(result, status, xhr){
+		if (result.objectMap.gridKeyColumnAdditionalValue) {
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', width: 350, height:150, message: resourceBundle['proposalstatus.notinprogress.usernull'], autofade: false});
+		} else {
+			var unApprovedFlag = result.objectMap.gridKeyColumnValue;
+			if (unApprovedFlag) {
+				var errorObj = '<ul style="padding-left: 23px;margin-top:0;line-height:18px;">';
+				errorObj = errorObj + "<li>" + resourceBundle['warning.lineitem.unapproved'] + "</li>";
+				errorObj = errorObj + "<li>" + resourceBundle[confirmMsg] + "</li>";
+				errorObj = errorObj + "</ul>";
+				if (proposalStatus == "SOLD") {
+					new ModalDialogConfirm(errorObj, arr, validateProposalForBridging);
+				} else if (proposalStatus == "INPROGRESS" && "Expired" == currentStatus) {
+					new ModalDialogConfirm(errorObj, arr, openDlgToRefreshConversionRate);
+				} else if (proposalStatus == "REVIEW") {
+					new ModalDialogConfirm(errorObj, arr, optionToReview);
+				} else {
+					new ModalDialogConfirm(errorObj, arr, updateStatus);
+				}
+			} else {
+				if (proposalStatus == "SOLD") {
+					var errorObj = resourceBundle[confirmMsg];
+					new ModalDialogConfirm(errorObj, arr, validateProposalForBridging);
+				} else if (proposalStatus == "INPROGRESS" && "Expired" == currentStatus) {
+					openDlgToRefreshConversionRate(arr);
+				} else if (proposalStatus == "REVIEW") {
+					optionToReview(arr);
+				} else {
+					var errorObj = resourceBundle[confirmMsg];
+					new ModalDialogConfirm(errorObj, arr, updateStatus);
+				}
+			}
+		}
+	};
+	ajaxPricingReq.submit();
+ }
+ 
+ function cloneProposal(proposalId){
+		
+		var ajaxReq = new AjaxRequest();
+	    ajaxReq.url = "./proposalWorkflow/getProposalCloneDisplayPage.action?id=" + proposalId;
+		ajaxReq.dataType = 'html';
+	    ajaxReq.success = function(result, status, xhr) {
+			$("#cloneProposalContainer").html(result);
+	    	 var cloneProposal = new ModalDialog();
+	         cloneProposal.width = 300;
+	         cloneProposal.height = 250;
+			 cloneProposal.title = 'Clone Proposal';
+	         cloneProposal.resizable = false;
+	         cloneProposal.draggable = true;
+			 cloneProposal.buttons = [{
+			 text: "Clone",
+	         click : function(){
+			 		var allVals = [];
+					$('[name=lookupOptionId]:checked','#proposalOptionListing').each(function(){
+						allVals.push($(this).val());
+					});
+					if(allVals.length == 0){
+						$("#errorOptionSelect", "div[aria-labelledby=ui-dialog-title-cloneProposalDialogue]").show();
+						$(".ui-dialog-buttonset button:contains('Clone')").button("enable");
+					} else{
+						var ajaxSubReq = new AjaxRequest();
+						ajaxSubReq.url = "./proposalWorkflow/getProposalClone.action?proposalId="+proposalId+"&optionIds="+allVals;
+						ajaxSubReq.success = function(result, status, xhr){
+							 $("#cloneProposalDialogue").dialog("close");
+							var returnId = result.objectMap.gridKeyColumnValue;
+							jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.proposal.cloned']});
+							try{
+								window.opener.openProposal(returnId);
+							}catch(e){
+								var url =  $("#contextPath").val() + "/manageProposal.action?_flowId=workOnProposal&proposalId="+returnId;
+								var width = screen.width - 100;
+								var height = screen.height - 100;
+								window.open(url, "proposal"+returnId, 'left=50,top=0,width='+width+',height='+height+',toolbar=0,resizable=1,menubar=0,scrollbars=1,location=no');
+							}
+						};
+						ajaxSubReq.submit();
+						$(".ui-dialog-buttonset button:contains('Clone')").button("disable");
+					}
+			 }
+			 },{
+				text: "Close",
+				click: function(){
+	             $("#cloneProposalDialogue").dialog("close");
+	         }  
+			 }];      
+	          $("#cloneProposalDialogue").dialog(cloneProposal);		  
+	          $("#cloneProposalDialogue").dialog("open");
+			  $(".ui-dialog-buttonpane", "div[aria-labelledby=ui-dialog-title-cloneProposalDialogue]").append("<div id='errorOptionSelect' class='model-dialog-error'>" + resourceBundle['error.select.option'] + "</div>");
+	          $("#errorOptionSelect", "div[aria-labelledby=ui-dialog-title-cloneProposalDialogue]").hide();
+	    };
+		ajaxReq.submit();
+	}
+ 
+ function updateStatus(arr){
+ 	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./proposalWorkflow/updateProposalStatus.action?id=" + arr[2] + "&proposalStatus=" + arr[3] + "&version=" + arr[5] ;
+	ajaxReq.success = function(result, status, xhr) {
+		if (arr[3] == "SOLD" && arr[4] == 'message.generic.proposal.stausChanged.targeting.not.pushed.sold') {
+			jQuery("#runtimeDialogDiv").model({theme: 'Warning', width: 405, height:190, message: resourceBundle[arr[4]], autofade: false});
+		}else if (result.objectMap.gridKeyColumnAdditionalValue){
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', width: 350, height:150, message: resourceBundle['proposalstatus.notinprogress.usernull'], autofade: false});
+		}else if(result.objectMap.unapprovedViewableLineItem){
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', width: 350, height:150, message: resourceBundle['proposalstatus.notProposed.unapproved.viewable.lineItems'], autofade: false});
+		}else {
+			jQuery("#runtimeDialogDiv").model({theme: 'Success', width: 350, height:150, message: resourceBundle[arr[4]]});
+		}
+	    stateChangeRequest(arr[0], arr[1]);
+	};
+	ajaxReq.submit();
+ }
+ 
+ function validateProposalForBridging(arr){
+ 	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./proposalWorkflow/validateProposalForBridging.action?proposalId="+arr[2];
+    ajaxReq.success = function(result, status, xhr) { 
+		if(result.objectMap.VALIDATION_TYPE == 'ERROR'){
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle[result.objectMap.MESSAGE]});
+		} else if (result.objectMap.VALIDATION_TYPE == 'CUSTOM_ERROR'){
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', width:350, height:200, autofade: false, message: result.objectMap.MESSAGE});
+		} else {
+			createOrder(arr);
+		}
+	 }
+    ajaxReq.submit();
+ }
+ 
+ function createOrder(arr){
+ 	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./proposalWorkflow/createOrder.action?proposalId="+arr[2];
+    ajaxReq.success = function(result, status, xhr) { 
+		var returnedObject = result.objectMap.gridKeyColumnValue;
+		if (! result.objectMap.allTargetingPushed) {
+			arr[4] = 'message.generic.proposal.stausChanged.targeting.not.pushed.sold';
+		}
+		arr[5] = result.objectMap.version;
+		updateStatus(arr);
+	 }
+    ajaxReq.submit();
+ }
+
+function openDlgToRefreshConversionRate(arr){
+	var errorObj = resourceBundle['refresh.conversion.rate'];
+	new ModalDialogConfirmWith2Funcs(errorObj,arr,refreshCurrencyConversionRate,arr,updateStatus);
+}
+
+function refreshCurrencyConversionRate(arr){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = './proposalWorkflow/refreshConversionRate.action?proposalId=' + arr[2] ;
+	ajaxReq.success = function(result, status, xhr){
+		var conversionRate = result.objectMap.gridKeyColumnValue;
+		$("#conversionRate").val(conversionRate);
+		arr[5] = result.objectMap.version;
+	    updateStatus(arr);
+	};
+	ajaxReq.submit();
+}
+
+function optionToReview(arr){
+	var ajaxReq = new AjaxRequest();
+    ajaxReq.url = "./proposalWorkflow/getReviewStatusPage.action?id=" + arr[2];
+	ajaxReq.dataType = 'html';
+    ajaxReq.success = function(result, status, xhr) {
+		$("#proposalReviewContainer").html(result);
+    	 var reviewProposal = new ModalDialog();
+    	 reviewProposal.width = 700;
+    	 reviewProposal.height = 280;
+    	 reviewProposal.title = 'Review Proposal';
+    	 reviewProposal.resizable = false;
+    	 reviewProposal.draggable = true;
+    	 reviewProposal.buttons = [{
+		 text: "Review",
+         click : function(){
+		 	var optionId = "";
+		 	$('[name=reviewOptionId]:checked','#proposalReviewOptionListing').each(function(){
+					optionId = $(this).val();
+				});
+		 	var ajaxReq = new AjaxRequest();
+			ajaxReq.url = './proposalWorkflow/markOptionForReview.action?id=' + arr[2] +'&optionId='+ optionId +'&version='+ arr[5];
+			ajaxReq.success = function(result, status, xhr){
+				jQuery("#runtimeDialogDiv").model({theme: 'Success', width: 350,  message: resourceBundle[arr[4]]});
+	    		stateChangeRequest(arr[0], arr[1]);				
+        	 	$("#proposalReviewDialogue").dialog("close");
+			};
+			ajaxReq.submit();
+			$(".ui-dialog-buttonset button:contains('Review')").button("disable");
+		 }
+		 },{
+			text: "Close",
+			click: function(){
+             $("#proposalReviewDialogue").dialog("close");
+         }  
+		 }];
+          $("#proposalReviewDialogue").dialog(reviewProposal);		  
+          $("#proposalReviewDialogue").dialog("open");		  
+    };
+	ajaxReq.submit();
+}
+
+function submitForPricingReview(flowurl, stateId, proposalId){
+	var arr = [flowurl, stateId, proposalId];
+	var ajaxPricingReq = new AjaxRequest();
+	ajaxPricingReq.url = "./proposalWorkflow/checkPricingStatus.action?id=" + proposalId;
+	ajaxPricingReq.success = function(result, status, xhr) {
+		if (result.objectMap.gridKeyColumnAdditionalValue) {
+			jQuery("#runtimeDialogDiv").model({theme : 'Error', width : 350, height : 150, message : resourceBundle['proposalstatus.notinprogress.usernull'], autofade : false});
+		} else {
+			var unApprovedFlag = result.objectMap.gridKeyColumnValue;
+			if (unApprovedFlag) {
+				var errorObj = '<ul style="padding-left: 23px;margin-top:0;line-height:18px;">';
+				errorObj = errorObj + "<li>" + resourceBundle['warning.lineitem.unapproved'] + "</li>";
+				errorObj = errorObj + "<li>" + resourceBundle['confirm.submited.for.pricing.review'] + "</li>";
+				errorObj = errorObj + "</ul>";
+				new ModalDialogConfirmForPricingReview(errorObj, arr, savePricingNotes);
+			} else {
+				new ModalDialogConfirmForPricingReview(resourceBundle['confirm.submited.for.pricing.review'], arr, savePricingNotes);
+			}
+		}
+	};
+	ajaxPricingReq.submit();
+}
+
+function submitPricingReview(arr, pricingNotes){
+	$("#submittedForReviewDialogDiv").dialog( "close" );
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.type = 'POST';
+	ajaxReq.url = './proposalWorkflow/submitForPricingReview.action?proposalId=' + arr[2];
+	ajaxReq.data = { "pricingNotes": pricingNotes};
+	ajaxReq.success = function(result, status, xhr){
+		if (result.objectMap.isUserNullAndStatusNotDeleted) {
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', width: 350, height:150, message: resourceBundle['proposalstatus.notinprogress.usernull'], autofade: false});
+		} else {
+			jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.submited.for.pricing.review']});
+		}
+		stateChangeRequest(arr[0], arr[1]);
+	};
+	ajaxReq.submit();
+}
+
+function  submitBackToPlanner(flowurl, stateId, proposalId){
+	var arr = [flowurl, stateId, proposalId];
+	var ajaxReq = new AjaxRequest();
+    ajaxReq.url = "./proposalWorkflow/getOptionThresHoldValuePage.action?id=" + arr[2];
+	ajaxReq.dataType = 'html';
+    ajaxReq.success = function(result, status, xhr) {
+		$("#optionsThresholdValueContainer").html(result);
+    	 var optionsThresholdValue = new ModalDialog();
+    	 optionsThresholdValue.width = 650;
+    	 optionsThresholdValue.height = 340;
+    	 optionsThresholdValue.title = 'Options Threshold Value';
+    	 optionsThresholdValue.resizable = false;
+    	 optionsThresholdValue.draggable = true;
+    	 optionsThresholdValue.buttons = [{
+    		 text: "Save",
+    		 click : function(){
+    			 clearCSSErrors('#proposalOptionThresholdValueListing');
+    			 $(".ui-dialog-buttonpane #errorDiv").hide();
+    			 var thresholdValueData = getOptionThresholdDataToSave();
+    			 var reviewedOptionIds = "";
+                 $("#optionsThresholdValueTable", "#proposalOptionThresholdValueListing").find(':checkbox').each(function(){
+                     if ($(this).is(":checked")  && $(this).attr("id") != 'reviewedOption_Header') {
+                    	 reviewedOptionIds = reviewedOptionIds + $(this).val() + ",";
+                     }
+                 });
+                 if (reviewedOptionIds.length > 0) {
+                	 
+                	 reviewedOptionIds = $.trim(reviewedOptionIds).substring(0, reviewedOptionIds.length - 1);
+	    			 var ajaxReq = new AjaxRequest();
+	    			 ajaxReq.url = './proposalWorkflow/submitBackToPlanner.action?proposalId=' + arr[2] +'&optionThresholdValueString=' + encodeURIComponent(thresholdValueData) + '&reviewedOptionsIds=' + reviewedOptionIds;
+	    			 ajaxReq.success = function(result, status, xhr) {
+	    				 if(result.validationFailed) {
+	    					 renderError('#proposalOptionThresholdValueListing', result);
+	    					 $(".ui-dialog-buttonset button:contains('Save')").button("enable");
+	    				 } else {
+						 	jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.submited.back.to.planner']});
+	    					stateChangeRequest(arr[0], arr[1]);
+	    					$("#optionsThresholdValueDialogue").dialog("close");
+	    				 }   				 	
+	    			 };
+	    			 $(".ui-dialog-buttonset button:contains('Save')").button("disable");
+	    			 ajaxReq.submit();
+                 }else{
+             		if ( $("#errorDiv", "div[aria-labelledby=ui-dialog-title-optionsThresholdValueDialogue]").length == 0) {
+             			$(".ui-dialog-buttonpane", "div[aria-labelledby=ui-dialog-title-optionsThresholdValueDialogue]").append("<div id='errorDiv' class='model-dialog-error'>" + resourceBundle['error.no.option.selected.to.mark.as.reviewed'] + "</div>");
+             		}
+             		$(".ui-dialog-buttonpane #errorDiv").show();
+                 }
+		 	}
+    	 },{
+			text: "Close",
+			click: function(){
+             $("#optionsThresholdValueDialogue").dialog("close");
+			}  
+		 }];
+          $("#optionsThresholdValueDialogue").dialog(optionsThresholdValue);		  
+          $("#optionsThresholdValueDialogue").dialog("open");
+    };
+	ajaxReq.submit();
+
+}
+
+function toggleCreateVersion(str){	
+	value=$('#currentVersion').val();	
+	if(str.charAt(str.indexOf("=") - 1)!=value){
+		$("#createVersion").css("display","none");
+	}else{
+		$("#createVersion").css("display","block");
+	}
+}
+
+/**
+ * Function creates a JsonString to pass to server
+ */
+function getOptionThresholdDataToSave(){
+	var optionsThresholdValue = new Array();
+	var objId ="";
+	var thresholdValueJsonStr = "";    
+	$("#optionsThresholdValueTable tr").each(function(){
+    	objId = $(this).attr("id");
+        if (objId != "optionsThresholdValueHeader") { 
+        	if($('#reviewedOption_' + objId).is(":checked")){
+	        	var object = new Object();
+				object.optionId = objId;
+			    object.qualifingLineItemInvestment = $('#totalInvestment_' + objId).text();
+			    object.thresholdLimit = $('#Threshold_' + objId).val();
+			    optionsThresholdValue.push(object);
+			    thresholdValueJsonStr = JSON.stringify(optionsThresholdValue);
+        	}
+        }
+    });
+	return thresholdValueJsonStr;
+}
+
+function ModalDialogConfirmForPricingReview (message, funcArguments, okFun) {
+	var valueToPrint = "<table><tr><td><img src='"+$("#contextPath").val()+"/images/warning.png'></td><td style='line-height:2; vertical-align: top;'>"+ message +"</td></tr></table>" +
+			"<div class='spacer7'></div>" +
+			"<table id='pricingNotesTable'><tr><td style='vertical-align:middle;' nowrap='nowrap'><label class='label-bold' colspan='1'>Enter additional notes (if any) for the Pricing team here :-&nbsp;&nbsp;</label></td></tr>"+
+			"<tr><td colspan='6'><textarea id='pricingNotes' cols='68' rows='4'></textarea>" +
+			"<img src='" +$("#contextPath").val()+"/images/info-icon.png' class='tip-tool' style='margin-left:3px;position:absolute;' title='Maximum 3072 characters are allowed.'/>" +
+			"<div id='charsRemainingPricingReviewNotes' class='chars-remaining'></div></td></tr></table>";			
+	
+	$("#submittedForReviewDialogDiv").html(valueToPrint);
+	$(".tip-tool[title]", "#submittedForReviewDialogDiv").qtip({position:{my:  'left center',at: 'right center'}, style: {classes: 'ui-tooltip-blue'} });
+	
+	jQuery("#pricingNotes", "#pricingNotesTable").limiter(3072, $("#charsRemainingPricingReviewNotes", "#pricingNotesTable"));
+	
+	$("#submittedForReviewDialogDiv").dialog({
+		dialogClass: 'alert',
+		show: 'slide',
+		resizable: false,
+		showTitlebar: true,
+		modal: true,
+		width: 450,
+		buttons : {
+			Yes: function(){
+				if($.isFunction(okFun)){
+					okFun(funcArguments);
+				}
+			},
+			No: function () {
+				$( this ).dialog( "close" );
+			}
+		}
+	});
+};
+
+function savePricingNotes(arr){
+	if($.trim($("#pricingNotes", "#pricingNotesTable").val()) != ""){
+		var notesId = 0;
+		var ajaxReq = new AjaxRequest();
+		ajaxReq.type = 'POST';
+		ajaxReq.url = './proposalWorkflow/saveNotes.action?notesId=' + notesId + "&proposalId=" + arr[2];
+		ajaxReq.data = { notesDescription: $("#pricingNotes", "#pricingNotesTable").val()};
+		ajaxReq.success = function(result, status, xhr){
+			clearCSSErrors("#pricingNotesTable");
+			if(result.objectMap.descriptionContainsXSSContent) {
+				$("#pricingNotes", "#pricingNotesTable").addClass("errorElement errortip").attr("title", "Only non HTML characters are allowed." + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+				renderErrorQtip("#pricingNotesTable");
+			} else if(result.objectMap.descriptionLengthExceed3072){
+				$("#pricingNotes", "#pricingNotesTable").addClass("errorElement errortip").attr("title", "Maximum allowed characters are 3072." + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+				renderErrorQtip("#pricingNotesTable");
+			} else {
+				submitPricingReview(arr , $.trim($("#pricingNotes", "#pricingNotesTable").val()));
+			}
+		};
+		ajaxReq.submit();
+	} else {
+		submitPricingReview(arr, "");
+	}
+}
+
+
+/**
+ * Checks all the custom checkboxes of options threshold table if the header checkbox is checked else unchecks all the checkboxes.
+ * @param select
+ */
+function customReviewedOptionSelect(select){
+    if ($(select).is(":checked")) {
+        $("#optionsThresholdValueTable", "#proposalOptionThresholdValueListing").find(':checkbox').each(function(){
+            $(this).attr("checked", "checked");
+            var optionId = $(this).val();
+            $("#Threshold_" + optionId).removeClass('input-textbox-readonly');
+            $("#Threshold_" + optionId).attr('readonly', false);
+            $("#Threshold_" + optionId).val($("#thresholdValue_" + optionId).text());
+        });
+    } else {
+        $("#optionsThresholdValueTable", "#proposalOptionThresholdValueListing").find(':checkbox').each(function(){
+            $(this).attr("checked", false);
+            var optionId = $(this).val();
+            $("#Threshold_" + optionId).addClass('input-textbox-readonly');
+            $("#Threshold_" + optionId).attr('readonly', true);
+            $("#Threshold_" + optionId).val('');
+        });
+    }
+}
+
+/**
+ * Function for checking the checkbox in the header of the options threshold table if all the custom checkboxes are checked else uncheck the header checkbox. 
+ * @param select
+ */
+function selectUnselectReviewOptHeaderChkBox(select) {
+	var optionId = $(select).val();
+	if(!($(select).is(":checked"))){
+		$("#reviewedOption_Header").attr("checked", false);
+		$("#Threshold_" + optionId).addClass('input-textbox-readonly');
+        $("#Threshold_" + optionId).attr('readonly', true);
+        $("#Threshold_" + optionId).val('');
+	}else{
+		$("#Threshold_" + optionId).removeClass('input-textbox-readonly');
+        $("#Threshold_" + optionId).attr('readonly', false);
+        $("#Threshold_" + optionId).val($("#thresholdValue_" + optionId).text());
+	}
+	if($('[name=customReviewedOption]:not(:checked)',"#optionsThresholdValueTable").size() == 0){
+  		$("#reviewedOption_Header").attr("checked", true);
+  	}
+}

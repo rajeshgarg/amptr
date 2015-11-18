@@ -1,0 +1,871 @@
+/**
+ * @author amandeep.singh
+ */
+$(document).ready(function () {
+   	if (resourceBundle == null || resourceBundle == "") {
+        initalizeResourceBundle();
+    }
+    else {
+        initBasicInfo();
+    }
+   	jQuery("#reservationEmails", "#basicInfoParentDiv").limiter(500, $("#charsRemainingReservationMails", "#basicInfoParentDiv"));
+});
+
+/**
+ * Save proposal basic info data
+ * @param {Object} basicInfoFormId
+ * @param {Object} flowurl
+ * @param {Object} event
+ */
+function saveProposalData(basicInfoFormId, flowurl, event, eventBuildProposal){
+	$("#basicInfoParentDiv #"+basicInfoFormId).attr("action", "./proposalWorkflow/saveProposalDetail.action");
+	$("#currency" , "#propoalDetails").val($("#currencyId option:selected").text());
+	var instanceFormManager = new FormManager();
+	instanceFormManager.formName = basicInfoFormId;
+	var basicInfoForm = new JQueryAjaxForm(instanceFormManager);
+    basicInfoForm.doCustomProcessingAfterFormSucsesJson = function(jsonResponse, XMLHTTPRequest){   
+        var returnedId = jsonResponse.objectMap.gridKeyColumnValue;
+		$("#propVersionStaleObject").val(jsonResponse.objectMap.version);
+		jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.ProposalSavedSuccess']});
+		$("#proposalNameInHeader","#header").text($("#proposalName","#propoalDetails").val());//To set proposal name in Header
+		$("#proposalName","#propoalDetails").attr("title",$("#proposalName","#propoalDetails").val());		
+		if($("#basicInfoParentDiv #id").val() == '0'){
+			var url =  $("#contextPath").val() + "/manageProposal.action?_flowId=workOnProposal&proposalId="+returnedId;
+			window.location.replace(url);
+			//stateChangeRequest(flowurl, event + "&proposalVersion=1&proposalId="+returnedId);			
+			var myWindow = window.opener.window["proposal0"];
+			myWindow.name = "proposal" + returnedId;
+			window.opener.window["proposal" + returnedId] = myWindow;
+			window.opener.childwindow = window.opener.childwindow.replace("proposal0", myWindow.name);		
+		}
+		operationCancel();
+		$("#modifySalesforceId","#basicInfoParentDiv").val($("#salesforceID","#basicInfoParentDiv").val());
+		$("#sfIdClose","#basicInfoParentDiv").hide();
+		showAuditHistory();
+		reloadJqGridAfterAddRecord('optionsTable', "optionName");
+    };
+    basicInfoForm.doCustomProcessingAfterValidationFailedJson = function(jsonResponse, XMLHTTPRequest) {    	
+		var errorArray = jsonResponse.errorList;
+
+		jQuery.each(errorArray, function(i, error) {
+			if (error.field == "requestedOn" || error.field == "dueOn") {
+				var index = instanceFormManager.formName.indexOf("basicForm");
+				jQuery("#" + instanceFormManager.formName.substring(0, index) + "_" + error.field)
+					.addClass("errorElement errortip").attr("title", error.errorMessageForUI + '<BR><b>Help:</b> ' + error.errorHelpMessageForUI);
+			}
+			
+			if (error.field == "startDate" || error.field == "endDate") {
+				var index = instanceFormManager.formName.indexOf("basicForm");
+				jQuery("#" + instanceFormManager.formName.substring(0, index) + "_" + error.field)
+					.addClass("errorElement errortip").attr("title", error.errorMessageForUI + '<BR><b>Help:</b> ' + error.errorHelpMessageForUI);
+			}			
+		});
+		$('.errortip', "#" + instanceFormManager.formName).qtip( {
+			style: {
+            	classes: 'ui-tooltip-red' 
+         	},
+         	position:{my:  'bottom center',at: 'top center'}
+		});
+	};
+    basicInfoForm.submit();   
+}
+
+/**
+ * Enable / Disable new advertiser name based on advertiser drop down value
+ */
+function setAdvertiserName() {
+	var value = $("#basicInfoParentDiv #advertiserName").val();
+	if (value == '' || value == 0) {
+		$("#basicInfoParentDiv #newAdvertiserName").removeAttr("disabled");
+		$("#basicInfoParentDiv #newAdvertiserName").removeClass("input-textbox-readonly");
+		generateProposalName();
+	} else {
+        $("#basicInfoParentDiv #newAdvertiserName").val("");
+		$("#basicInfoParentDiv #newAdvertiserName").attr("disabled", true);
+		$("#basicInfoParentDiv #newAdvertiserName").addClass("input-textbox-readonly");
+	}
+}
+
+function setSpecialAdvertiserImg() {	
+	if($("#advertiserName", "#basicInfoParentDiv").val() == '' || $("#advertiserName", "#basicInfoParentDiv").val() == 0){
+		$("#specialAdvertiser", "#basicForm").val(false);
+		$("#specialAdvertiserImg", "#basicInfoParentDiv").hide();
+	} else {
+		getAdvertiserType();
+	}
+}
+/**
+ * Method Opens a dialogue for Option Edit/Add
+ * @param {Object} optionId
+ */
+function openDialogueForOption(optionId){	
+	 var addEditOption = new ModalDialog();
+        addEditOption.width = 700;
+        addEditOption.height = 200;
+		if (optionId == 0) {
+			addEditOption.title = 'Add Option';
+		}else{
+			addEditOption.title = 'Edit Option';
+		}
+        addEditOption.resizable = false;
+        addEditOption.draggable = true;
+        addEditOption.buttons.Save = function(){	
+			var instanceFormManager = new FormManager();
+			instanceFormManager.gridName = 'optionsTable';
+			instanceFormManager.formName = 'optionForm';
+			
+			var optionForm = new JQueryAjaxForm(instanceFormManager);
+			optionForm.doCustomProcessingAfterFormSucsesJson = function(jsonResponse, XMLHTTPRequest){
+				 showAuditHistory();
+				var returnedObject = jsonResponse.objectMap.gridKeyColumnValue;
+				$(".ui-dialog-buttonset button:contains('Save')").button("enable");
+				/**
+				 * To check optionId =-1 and display the error message for maximum possible options for a proposal
+				 */
+				if(returnedObject.optionId == -1){
+					jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle['error.generic.maximumoptions']});
+					$("#optionDialogue").dialog("close");
+				}else{
+				
+				if ($('#optionId', '#optionContainer').val() == 0) {
+					reloadJqGridAfterAddRecord('optionsTable', "optionName");
+					appendOptionsToNavigator(returnedObject.optionId, returnedObject.optionName);
+				}
+				else {
+					jQuery("#optionsTable").setCell($('#optionId', '#optionContainer').val(), "budget", returnedObject.budget);
+				}
+				jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.OptionSaveSuccess']});
+				$("#optionDialogue").dialog("close");
+			 }
+           }
+			optionForm.doCustomProcessingAfterValidationFailedJson = function(jsonResponse, XMLHTTPRequest){
+				$(".ui-dialog-buttonset button:contains('Save')").button("enable");
+
+			}
+			$("#optionForm").attr("action","./proposalWorkflow/saveOption.action?id="+$("#basicInfoParentDiv #id").val());
+			optionForm.submit();
+			$(".ui-dialog-buttonset button:contains('Save')").button("disable");
+        
+		}
+        addEditOption.buttons.Close = function(){
+             $("#optionDialogue").dialog("close");
+        }        
+        $("#optionDialogue").dialog(addEditOption);
+        enableDialogButton("optionDialogue");
+		var topRowId = $("#optionsTable").getDataIDs()[0];
+		var topRowData = $("#optionsTable").jqGrid('getRowData', topRowId);
+		$('#optionId', '#optionContainer').val(optionId);
+		$('#maxOptionNo', '#optionContainer').val(topRowData.maxOptionNo);
+		if (optionId > 0) {            
+           var rowData = $("#optionsTable").jqGrid('getRowData', optionId);
+		   var optionName = rowData.optionName;
+		   optionName = optionName.substring(optionName.indexOf("<u>")+3,optionName.indexOf("</u>"));
+           $('#optionName', '#optionContainer').html(optionName);
+		   $('#budget', '#optionContainer').val(rowData.budget);           
+       } else {
+    	   if($.trim(topRowData.maxOptionNo) !="" && !isNaN($.trim(topRowData.maxOptionNo))){
+    		   $('#optionName', '#optionContainer').html('Option-'+(parseInt($.trim(topRowData.maxOptionNo))+1));
+    	   }else{
+    		   $('#optionName', '#optionContainer').html('Option-1');
+    	   }
+		   $('#budget', '#optionContainer').val('');  
+	   }
+	   clearCSSErrors("#optionForm");
+       $("#optionDialogue").dialog("open");
+}
+
+function initBasicInfo(){	
+	if ($("#basicInfoParentDiv #id").val() != '0') {
+		initializeDocumentsBlock();
+		initializeOptionsGrid();
+		showHideGridIcons($("#isAssigned","#basicInfoParentDiv").val());
+		$("#proposalName","#propoalDetails").attr("title",$("#proposalName","#propoalDetails").val());		
+		$("#agencyMargin","#basicInfoParentDiv").attr("readonly","true");
+		$("#agencyMargin","#basicInfoParentDiv").attr("class","input-textbox-readonly");
+		showProposalNotes();
+		showAuditHistory();
+		if($("#specialAdvertiser", "#basicForm").val() == "true"){
+			$("#specialAdvertiserImg", "#basicInfoParentDiv").show();
+		}else{
+			$("#specialAdvertiserImg", "#basicInfoParentDiv").hide();
+		}
+	} else {
+		$('#criticality',"#propoalDetails").val('REGULAR');
+		$("#proposalDocuments","#basicInfoParentDiv").hide();
+		$("#optionsGrid","#basicInfoParentDiv").hide();
+		$("#notesContainer","#basicInfoParentDiv").hide();
+		$("#auditHistoryContainer","#basicInfoParentDiv").hide();
+		$("#agencyMargin","#basicInfoParentDiv").val('15.00');
+		$("#specialAdvertiserImg", "#basicInfoParentDiv").hide();
+	}
+	if($("#basicInfoParentDiv #proposalStatus").val() == 'DELETED'){
+		$('#blocker').height($("body").height());
+		window.scrollTo(0, 0);
+		$("body").css("overflow-y","hidden");
+	}
+	$("input[class=numericdecimal]", "#optionForm").numeric({
+        negative: false
+    });
+	
+    $("input[class=numericdecimal]", "#basicForm").numeric({
+        negative: false
+    });
+    
+    $("input[class=numeric]", "#basicForm").numeric({
+        decimal: false,
+        negative: false
+    });
+    
+    $("#requestedOn").datetimepicker({
+        showOn: "both",
+        buttonText: "Select Date",
+        buttonImage: "./images/calendar.gif",
+        buttonImageOnly: true,
+        hour: 23,
+    	minute: 59
+    });
+    
+    $("#dueOn").datetimepicker({
+        showOn: "both",
+        buttonText: "Select Date",
+        buttonImage: "./images/calendar.gif",
+        buttonImageOnly: true,
+        hour: 23,
+    	minute: 59
+    });
+    
+	var startDateBasicInfo = jQuery( '#startDate, #endDate' ).datepicker({
+		autoSize: true,
+		showOn: "both",
+		buttonText: "Select Date",
+		buttonImage: './images/calendar.gif',
+		buttonImageOnly: true,
+		numberOfMonths: 3,
+		onSelect: function(selectedDate){
+            date = $.datepicker.parseDate($(this).data("datepicker").settings.dateFormat || $.datepicker._defaults.dateFormat, selectedDate, $(this).data("datepicker").settings);
+		}
+	});
+
+    $( "#basicInfoParentDiv #requestedOnReset" ).bind( "click", function(event, ui) {
+    	$("#requestedOn").val("");
+	});	
+	
+	$( "#basicInfoParentDiv #dueOnReset" ).bind( "click", function(event, ui) {
+		$("#dueOn").val("");
+	});
+	
+    $("#basicInfoParentDiv #startDateReset").bind("click", function(event, ui){
+      	$("#startDate", "#basicInfoParentDiv").val("");
+    });
+    
+     $("#basicInfoParentDiv #endDateReset").bind("click", function(event, ui){
+       	$("#endDate", "#basicInfoParentDiv").val("");
+    });
+	 
+    //In case of new proposal hide fields.
+    if ($("#basicInfoParentDiv #id").val() == 0) {
+        $("#basicInfoParentDiv #NextToBuildProposal").hide();
+        $("#basicInfoParentDiv #versionlevel").hide();
+        $("#basicInfoParentDiv #proposalVersion").hide();
+		//$("#basicInfoParentDiv #assignedByRow").hide();        
+    }
+    
+    $("#advertiserName", "#basicInfoParentDiv").autoSearch({url: "./proposalWorkflow/getAdvertiser.action", initUrl: "./proposalWorkflow/getAdvertiserById.action"});
+
+    $("#agencyName", "#basicInfoParentDiv").autoSearch({minimumInputLength: 2, url: "./proposalWorkflow/getAgency.action", initUrl: "./proposalWorkflow/getAgencyById.action"});
+
+    $("#basicInfoParentDiv #salescategory").select2();
+    setAdvertiserName();
+    if(($("#basicInfoParentDiv #sosOrderId").val() != null && $("#basicInfoParentDiv #sosOrderId").val()!='') || $("#basicInfoParentDiv #proposalStatus").val() == 'SOLD') {
+		 $("#basicInfoParentDiv #SOSURLRow").show();
+		 $("#basicInfoParentDiv #SOSURL").text($("#sosURL" , "#basicInfoParentDiv").val() + "/cgi-bin/sos/sales/calc.pl?SALESORDER_ID="+$("#sosOrderId" , "#basicInfoParentDiv").val());
+    } else {
+		$("#basicInfoParentDiv #SOSURLRow").hide();
+    }	
+	   
+   $("#campaignObjective", "#propoalDetails").multiselect({
+       selectedList: 2,
+   }).multiselectfilter();
+}
+
+function openCreatedOrder(){
+	var orderId = $("#sosOrderId" , "#basicInfoParentDiv").val();
+	var url =  $("#sosURL" , "#basicInfoParentDiv").val() + "/cgi-bin/sos/sales/calc.pl?SALESORDER_ID="+orderId;
+	var width = screen.width - 100;
+	var height = screen.height - 100;
+	return window.open(url, "order"+orderId, 'left=50,top=0,width='+width+',height='+height+',toolbar=0,resizable=1,menubar=0,scrollbars=1,location=no');
+}
+
+function initializeDocumentsBlock(){
+	jQuery("#proposalDocumentsGridForm").ajaxForm();
+    var proposalDocumentsGridOpts = initProposalAttachementGridOpts("proposalDocumentsGrid");
+    proposalDocumentsGridOpts.url = "./document/documentgriddata.action?documentFor=PROPOSAL&componentId=" + $("#id" , "#propoalDetails").val();
+    proposalDocumentsGridOpts.editurl = "./document/deletedocument.action?documentFor=PROPOSAL&componentId=" + $("#id" , "#propoalDetails").val();
+    $("#proposalDocumentsGridTable").jqGrid(proposalDocumentsGridOpts).navGrid("#proposalDocumentsGridPager", {
+        edit: false,
+        search: false,
+        addfunc: function(rowid){
+            jQuery("#proposalDocumentsGridForm #id").val('-1');
+            clearCSSErrors("#proposalDocumentsGridForm");
+            jQuery("#proposalDocumentsGridForm #fileName").val("");
+            jQuery("#proposalDocumentsGridDialog").dialog("open");
+        }
+    });
+    
+    var proposalDocumentsGridFormManager = new FormManager();
+    proposalDocumentsGridFormManager.gridName = "proposalDocumentsGridTable";
+    proposalDocumentsGridFormManager.formName = "proposalDocumentsGridForm";
+    
+    var proposalDocumentsGrid = new ModalDialog();
+    proposalDocumentsGrid.buttons.Save = function(){
+        $("#proposalDocumentsGridForm #componentId").val($("#id" , "#propoalDetails").val());
+        if ($("#proposalDocumentsGridForm #id").val() != -1) {
+            var id = $("#proposalDocumentsGridTable").jqGrid('getGridParam', 'selrow');
+            var ret = $("#proposalDocumentsGridTable").jqGrid('getRowData', id);
+            $("#proposalDocumentsGridForm #fileName").val(ret.fileName);
+        }
+        
+        //Register AJAX Forms Submit and provide various function
+        var proposalDocumentsGridForm = new JQueryAjaxForm(proposalDocumentsGridFormManager);
+        proposalDocumentsGridForm.dataType = 'xml';
+        proposalDocumentsGridForm.success = function(responseText, statusText, XMLHTTPRequest, $form ){
+        	if($(XMLHTTPRequest.responseXML).find('validationFailed').text()== "true"){
+        		var skipValidation = false;
+				jQuery.logThis(["XMLresponse ", XMLHTTPRequest.responseXML]);
+				
+				jQuery(XMLHTTPRequest.responseXML).find("errorList").each(function(){
+			        if(jQuery(this).find('uiFieldIdentifier').text()=="ProposalException"){	
+						jQuery("#runtimeDialogDiv").model({theme: 'Success', message: jQuery(this).find('errorMessageForUI').text()});
+			        	$("#proposalDocumentsGridDialog").dialog("close");
+			    		skipValidation = true;
+			        }
+			    });
+				if(!skipValidation){
+					renderValidationErrorFromXMLResponse('#'+proposalDocumentsGridFormManager.formName, XMLHTTPRequest.responseXML);
+				}
+				this.doCustomProcessingAfterValidationFailedXML(XMLHTTPRequest.responseXML, XMLHTTPRequest);
+			} else {	
+				this.doCustomProcessingAfterFormSucsessXML(XMLHTTPRequest.responseXML, XMLHTTPRequest);
+			}
+        };
+        proposalDocumentsGridForm.doCustomProcessingAfterValidationFailedXML = function(){
+            $("#proposalDocumentsGridMessage").text("");
+            $(".ui-dialog-buttonset button:contains('Save')").button("enable");
+        };
+        proposalDocumentsGridForm.doCustomProcessingAfterFormSucsessXML = function(){
+            $(proposalDocumentsGridFormManager.formIdentifier()).resetForm();
+            $("#proposalDocumentsGridMessage").text(resourceBundle['message.generic.documentUploadSuccess']).css("color", "green");
+            $(".ui-dialog-buttonset button:contains('Save')").button("enable");
+        };
+        proposalDocumentsGridForm.doCustomProcessingAfterFormError = function(){
+            $("#proposalDocumentsGridMessage").text("");
+            $(".ui-dialog-buttonset button:contains('Save')").button("enable");
+        };
+        proposalDocumentsGridForm.submit();
+        $(".ui-dialog-buttonset button:contains('Save')").button("disable");
+    };
+    
+    proposalDocumentsGrid.buttons.Close = function(){
+        $(this).dialog("close");
+    };
+
+	proposalDocumentsGrid.close = function(){
+		$("#proposalDocumentsGridForm").resetForm();
+        $("#proposalDocumentsGridMessage").text("");
+        $("#proposalDocumentsGridTable").trigger("reloadGrid");
+    };
+    $("#proposalDocumentsGridDialog").dialog(proposalDocumentsGrid);
+    enableDialogButton("proposalDocumentsGridDialog");
+}
+
+function initializeOptionsGrid(){
+	var optionsGridOpts = new proposalJqGridBaseOptions();
+	optionsGridOpts.colNames = ['Option Id','', 'Name' , 'Start Date' , 'End Date','Budget ($)','Effective CPM','Total Investment ($)','No. Of Versions','Option No','Default', 'Threshold Value', 'Pricing Reviewed On'];
+	optionsGridOpts.url = "./proposalWorkflow/loadOptionGridData.action?proposalId="+$("#basicInfoParentDiv #id").val();
+	optionsGridOpts.colModel = [
+		    {name:'optionId', index:'optionId', hidden:true, key:true},
+			{name:'defaultDisplay', index:'defaultDisplay', fixed:true, resizable:false, sortable:false, width:40},
+		    {name:'optionName', index:'optionName', sortable:false, resizable:false, width:70, formatter:optionslinkFormatter},
+		    {name:'startDate', index:'startDate', sortable:false, resizable:false, width:70},
+	    	{name:'endDate', index:'endDate', sortable:false, resizable:false, width:70},
+	    	{name:'budget', index:'budget', sortable:false, resizable:false, align:"right", width:80},
+	    	{name:'netCpm', index:'netCpm', sortable:false, resizable:false, align:"right", width:80},
+			{name:'offeredBudget', index:'offeredBudget', sortable:false, align:"right", resizable:false, width:80},
+			{name:'proposalVersion', index:'proposalVersion', sortable:false, align:"right", resizable:false, width:60},
+			{name:'maxOptionNo', index:'maxOptionNo', hidden:true},
+			{name:'defaultOption', index:'defaultOption', hidden:true},
+			{name:'thresholdLimit', index:'thresholdLimit', sortable:false, align:"right", resizable:false, width:70},
+			{name:'lastPricingReviewedDate', index:'lastPricingReviewedDate', sortable:false, resizable:false, width:90}
+	];
+    optionsGridOpts.afterGridCompleteFunction = function(){
+        //For marking default Option  
+        var rowIds = $("#optionsTable").getDataIDs();
+        for (var i = 0; i < rowIds.length; i++) {
+			 var colData = jQuery("#optionsTable").getRowData(rowIds[i])['defaultOption'];
+			 var be = "";
+			 if (colData == "true") {//Default Option
+				be = "<div style='float:left;' title='Default'>";
+				be = be + "<span class='default-enable' />";					 
+			 } else{				
+			 	if($("#isAssigned","#basicInfoParentDiv").val() == "true" || $("#proposalStatus","#basicInfoParentDiv").val() == "REVIEW" ){//For Read Only
+			 		be = "<div style='float:left; padding-left: 3px;' >";
+			 		be = be + "<span class='default-disable' />";					
+				}else{
+					be = "<div style='float:left;' title='Mark as default'>";
+					be = be + "<a onclick='markOptionAsDefault("+ rowIds[i] +")'> <span class='default-disable' style='cursor:pointer;'/> </a>";
+				}
+			 }
+			 be = be + "</div>"; 
+			 jQuery('#optionsTable').jqGrid('setRowData', rowIds[i], {defaultDisplay:be});			
+        }
+    };
+    optionsGridOpts.pager = $('#optionsPager');
+    optionsGridOpts.height = 140;
+    optionsGridOpts.sortname = 'optionId';
+	optionsGridOpts.pgbuttons = false;
+	optionsGridOpts.pgtext = null;
+	optionsGridOpts.rowList = [];
+    $("#optionsTable").jqGrid(optionsGridOpts).navGrid('#optionsPager', {
+        search: false,
+        addfunc: function(){
+            if ($("#optionsTable").getDataIDs().length == 5) {
+                jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle['error.generic.maximumoptions']});
+            }
+            else {
+                openDialogueForOption(0);
+            }
+        },
+        editfunc: function(rowId){
+            openDialogueForOption(rowId);
+        },
+        delfunc: function(rowId){
+            new ModalDialogConfirm(resourceBundle['message.confirm.option.delete'], '', function okFunc(){
+                var ajaxReq = new AjaxRequest();
+                ajaxReq.url = "./proposalWorkflow/deleteOption.action?optionId=" + rowId+"&proposalId="+$("#basicInfoParentDiv #id").val();
+                ajaxReq.success = function(result, status, xhr){
+                    var returnedOptionId = result.objectMap.gridKeyColumnValue;
+                    if (returnedOptionId == -1) {
+                        jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle['message.generic.DefaultOption']});
+                    }
+                    else {
+						jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.OptionDeletedSuccess']});
+                        reloadJqGridAfterAddRecord('optionsTable', "optionName");
+                        $('#' + rowId, '#proposalNavigatorRow').remove();
+						 showAuditHistory();
+                    }
+                }
+                ajaxReq.submit();
+            });
+        }
+    });		
+			
+	/**
+	 * Add Clone option
+	 */
+	$("#optionsTable").jqGrid('navButtonAdd', "#optionsPager", {
+		caption: "", id: "cloneOption_optionsTable",
+		title: "Clone Option", buttonicon: 'ui-icon-clone',
+		onClickButton: function(){
+			createOptionCloneConfirmationDialog();	
+		}
+	});
+}
+
+function optionslinkFormatter(cellvalue, options, rowObject){
+	var returnString = "";
+    if (cellvalue) {
+    	returnString = "<div>" +
+    	   "<a onClick=\"loadOption('" + $("#flowExecutionUrl","#basicInfoParentDiv").val() + "','eventShowProposalOptionData'," + $("#basicInfoParentDiv #id").val()+ "," + rowObject.optionId +")\" href='#'>" +
+   			"<u>" + cellvalue + "</u>" +
+   			"</a>" +
+   			"</div>";    	
+	} else {
+		returnString = "<div align='center'><span/></div>";
+	}
+    return returnString;
+};
+
+function createOptionCloneConfirmationDialog(){
+    if ($("#optionsTable").getDataIDs().length == 5) {
+		jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle['error.generic.maximumoptions']});
+    }
+    else {
+        var gsr = $("#optionsTable").jqGrid('getGridParam', 'selrow');
+        var optionName = $("#optionsTable").jqGrid('getCell', gsr, 'optionName');
+        optionName = optionName.substring(optionName.indexOf("<u>") + 3, optionName.indexOf("</u>"));
+        var message = resourceBundle['confirm.create.option.clone'] + "<b>" + optionName + "</b>" + "?";
+        var optionId = $("#optionsTable").jqGrid('getCell', gsr, 'optionId');
+        var propversion = $("#optionsTable").jqGrid('getCell', gsr, 'proposalVersion');
+        var maxOptionNo = $("#optionsTable").jqGrid('getCell', gsr, 'maxOptionNo');
+        var arr = [optionId, $("#basicInfoParentDiv #id").val(), propversion, maxOptionNo];
+        new ModalDialogConfirm(message, arr, createOptionClone);
+    }
+}
+
+/**
+ * Method clones a currently opened Proposal Option
+ * @param {Object} arr
+ */
+function createOptionClone(arr){		
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = './proposalWorkflow/cloneOption.action?optionId=' + arr[0]+"&id="+arr[1]+"&proposalVersion="+arr[2]+"&maxOptionNo="+arr[3];
+	ajaxReq.success = function(result, status, xhr){
+		var returnedObject = result.objectMap.gridKeyColumnValue;
+		jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.option.cloned']});
+		reloadJqGridAfterAddRecord('optionsTable', "optionName");
+		appendOptionsToNavigator(returnedObject.optionId, returnedObject.optionName);
+        showAuditHistory();	
+	};	
+	ajaxReq.submit();	
+}
+
+function appendOptionsToNavigator(optionId, optionName){
+	var valueToPrint = '<td id="'+optionId+'" class="main-prop-buttons"><p>';
+	valueToPrint = valueToPrint + '<a class="nav-anchor" title='+optionName;
+	valueToPrint = valueToPrint + ' onClick="loadOption(\''+$("#flowExecutionUrl","#basicInfoParentDiv").val()+'\',\'eventShowProposalOptionData\','+ $("#basicInfoParentDiv #id").val()+','+optionId+')">'+optionName+'</a></p></td>';
+	$('#proposalNavigatorRow','#statusContainer').append(valueToPrint);
+}
+
+function showHideGridIcons(flag){
+	if(flag == "false"){
+		$("#add_optionsTable","#optionsGrid").show();
+		$("#edit_optionsTable","#optionsGrid").show();
+		$("#del_optionsTable","#optionsGrid").show();
+		$("#cloneOption_optionsTable","#optionsGrid").show();
+		$("#add_proposalDocumentsGridTable","#proposalDocumentsContainer").show();
+		$("#del_proposalDocumentsGridTable","#proposalDocumentsContainer").show();
+		$("#proposalDocumentsGridTable").jqGrid('showCol','add');
+	}else{
+		$("#add_optionsTable","#optionsGrid").hide();
+		$("#edit_optionsTable","#optionsGrid").hide();
+		$("#del_optionsTable","#optionsGrid").hide();
+		$("#cloneOption_optionsTable","#optionsGrid").hide();
+		$("#add_proposalDocumentsGridTable","#proposalDocumentsContainer").hide();
+		$("#del_proposalDocumentsGridTable","#proposalDocumentsContainer").hide();
+		$("#proposalDocumentsGridTable").jqGrid('hideCol','add');
+	}
+	if($("#proposalStatus","#basicInfoParentDiv").val() == "REVIEW"){
+		$("#add_optionsTable","#optionsGrid").hide();
+		//$("#edit_optionsTable","#optionsGrid").hide();
+		$("#del_optionsTable","#optionsGrid").hide();
+		$("#cloneOption_optionsTable","#optionsGrid").hide();
+	}
+}
+
+function generateProposalName(){
+	var duedate= "";
+	
+	var c_name= $.trim($("#campaignName","#propoalDetails").val());
+	var a_name = '';
+	if($("#advertiserName").select2('data') != null && $("#advertiserName").val() !=''){
+		a_name= $.trim($("#advertiserName").select2('data').name);
+	}
+	var newa_name= $.trim($("#newAdvertiserName","#propoalDetails").val());
+	var s_cat= $.trim($("#salescategory option:selected","#propoalDetails").text());
+	
+	var propId = $("#id","#propoalDetails").val();
+	if(propId > 0){
+		duedate = $("#proposalName","#propoalDetails").val();
+		duedate = duedate.substring(duedate.lastIndexOf("_") + 1);
+	}else{
+		var dueon = $.trim($("#dueOn","#propoalDetails").val());
+		var dueonStr= dueon.toString();
+		duedate= dueonStr.substring(0,10);
+	}
+	var proposalname;
+	if(c_name!="" && duedate!=""){
+		if( a_name == "" && newa_name == ""){
+		 proposalname= s_cat+"_"+c_name +"_"+ duedate ;
+		}
+		else{
+			if(a_name!=""){
+				proposalname= a_name+"_"+c_name+"_"+duedate; }
+			else{
+				proposalname= newa_name+"_"+c_name+"_"+duedate; }
+		}
+		$("#proposalName","#propoalDetails").val(proposalname);	
+		$("#proposalName","#propoalDetails").attr("title",proposalname);
+	}				
+}
+
+function markOptionAsDefault(optionId){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = './proposalWorkflow/markOptionDefault.action?optionId=' + optionId + "&id=" + $("#basicInfoParentDiv #id").val();
+	ajaxReq.success = function(result, status, xhr){
+		var rowIds = $("#optionsTable").getDataIDs();
+		for (var i = 0; i < rowIds.length; i++) {
+			if (rowIds[i] == optionId) {
+				$("#"+optionId,"#proposalNavigatorRow").append('<span class="option-default-icon"></span>');
+				$("#optionsTable").setCell(rowIds[i], "defaultOption", "true");
+				var valueToadd = "<div style='float:left;' title='Default'><span class='default-enable' /></div>";
+				$("#optionsTable").setCell(rowIds[i], "defaultDisplay", valueToadd);
+			}
+			else {				
+				$(".option-default-icon","#"+rowIds[i]).remove();
+				$("#optionsTable").setCell(rowIds[i], "defaultOption", "false");
+				var valueToadd = "<div style='float:left; padding-left: 3px;' title='Mark as default'><a onclick='markOptionAsDefault("+ rowIds[i] +")'><span class='default-disable' style='cursor:pointer;'/></a></div>";
+				$("#optionsTable").setCell(rowIds[i], "defaultDisplay", valueToadd);
+			}
+		}
+	};
+	ajaxReq.submit();
+}
+
+
+function toggleContent (currentID, collapseID) {
+	if ($("#"+currentID).hasClass('open-section')) {
+		$("#"+collapseID).hide("slow");
+		$("#"+currentID).removeClass('open-section').addClass('close-section');
+		$("#"+currentID).attr("title", "Open");
+	} else {
+		$("#"+collapseID).show("slow");
+		$("#"+currentID).removeClass('close-section').addClass('open-section');
+		$("#"+currentID).attr("title", "Close");
+	}
+}
+
+function getCurrencyConversionRate(){
+	var currency = $("#currencyId option:selected").text();
+	if(currency == 'USD'){
+		$("#conversionRate").val('1');
+	}else{
+		var ajaxReq = new AjaxRequest();
+	    var currencyId = $("#currencyId option:selected").val();
+	    ajaxReq.url = './proposalWorkflow/getConversionRate.action' ;
+	    ajaxReq.success = function(result, status, xhr){
+	    	var conversionRates = result.objectMap.gridKeyColumnValue;
+	    	$.each( conversionRates, function( currncy, conversionRate ){
+	    		if(currncy == currency){
+	    			$("#conversionRate").val(conversionRate);
+	    		}
+	    		if(currncy == "EUR"){
+	    			$("#conversionRate_Euro").val(conversionRate);
+	    		}
+	    		if(currncy == "CNY"){
+	    			$("#conversionRate_Yen").val(conversionRate);
+	    		}
+	    	});
+	    	
+	    	
+	    };
+	    ajaxReq.submit();
+	}
+}
+
+/*
+Get audits history by proposal Id
+*/
+function showAuditHistory(){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.dataType = 'html';
+	ajaxReq.url = './proposalWorkflow/getAuditHistory.action?proposalId=' + $("#basicInfoParentDiv #id").val();
+	ajaxReq.success = function(result, status, xhr){
+		 $('#auditHistoryContainer').html(result);
+	};
+	ajaxReq.submit();
+}
+
+/**
+ * Function called on clicking the edit icon in the notes grid.
+ * @param notesId
+ */
+function editNotes(notesId){
+	$("#notesOperator", "#proposalNotesContainer").show();
+	clearCSSErrors("#proposalNotesContainer");
+	$("#notesSaveData", "#proposalNotesContainer").hide();
+	$("#notesResetData", "#proposalNotesContainer").hide();
+	$("#notesUpdateData", "#proposalNotesContainer").show();
+	$("#notesCancelData", "#proposalNotesContainer").show();
+	$("#writeNotes" , "#proposalNotesContainer").val($("#notesDetails_" + notesId).text());
+	$("#notesId", "#proposalNotesContainer").val(notesId);
+	$('#proposalId','#proposalNotesContainer').val($("#basicInfoParentDiv #id").val());
+	$("#writeNotes" , "#proposalNotesContainer").focus();
+	jQuery("textarea", "#proposalNotesContainer").change();
+	showHideSaveNotesInSalesForceBtn();
+}
+
+/**
+ * Deletes a particular note.
+ * @param rowId
+ */
+function deleteNotes(rowId){
+	new ModalDialogConfirm(resourceBundle['message.confirm.notes.delete'], '', function okFunc(){
+		clearCSSErrors("#proposalNotesContainer");
+		var ajaxReq = new AjaxRequest();
+	    ajaxReq.url = './proposalWorkflow/deleteNotes.action?&proposalId=' + $("#basicInfoParentDiv #id").val() + '&notesId=' + rowId ;
+	    ajaxReq.success = function(result, status, xhr){
+	    	var notesId = result.objectMap.gridKeyColumnValue;
+	    	$("#displayContainer_" + rowId).remove();
+	    	resetNotesFields();
+	    };
+	    ajaxReq.submit();
+	});
+}
+/**
+ * Updates the data of already created notes
+ */
+function saveUpdateNotesData(isPushedInSalesforce){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.type = 'POST';
+	if(isPushedInSalesforce){
+		ajaxReq.url = './proposalWorkflow/saveNotesInSalesForce.action?notesId=' + $("#notesId","#proposalNotesContainer").val() + "&proposalId=" + $("#basicInfoParentDiv #id").val() + "&pushedInSalesforce=true"  ;
+	} else {
+		ajaxReq.url = './proposalWorkflow/saveNotes.action?notesId=' + $("#notesId","#proposalNotesContainer").val() + "&proposalId=" + $("#basicInfoParentDiv #id").val();
+	}
+	ajaxReq.data = { notesDescription: $("#writeNotes" , "#proposalNotesContainer").val()};
+    ajaxReq.success = function(result, status, xhr){
+    	showNotesResult(result);
+    };
+    ajaxReq.submit();
+}
+
+function showNotesResult(result){
+	clearCSSErrors("#proposalNotesContainer");
+	if(result.objectMap.descriptionIsNull){
+		$("#writeNotes" , "#proposalNotesContainer").addClass("errorElement errortip").attr("title", "Notes is mandatory." + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+		renderErrorQtip("#proposalNotesContainer");
+	}else if(result.objectMap.descriptionContainsXSSContent){
+		$("#writeNotes" , "#proposalNotesContainer").addClass("errorElement errortip").attr("title", "Only non HTML characters are allowed." + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+		renderErrorQtip("#proposalNotesContainer");
+	}else if(result.objectMap.descriptionLengthExceed3072){
+		$("#writeNotes" , "#proposalNotesContainer").addClass("errorElement errortip").attr("title", "Maximum allowed characters are 3072." + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+		renderErrorQtip("#proposalNotesContainer");
+	}else{
+		if($("#notesId","#proposalNotesContainer").val() != 0){
+	    	var notes = result.objectMap.gridKeyColumnValue;
+	    	resetNotesFields();
+			$("#notesDetails_" + notes.id).text(notes.description);
+			$("#displayNotes_" + notes.id).text(result.objectMap.notesHeader);
+			$("#pushedInSalesforce_" + notes.id, "#proposalNotesContainer").val(notes.pushedInSalesforce);
+			jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.proposal.notes.edited']});
+			showHideNotesFields();
+			 if($("#pushedInSalesforce_" + notes.id, "#proposalNotesContainer").val() == 'true'){
+				 $("#deleteNotes_" + notes.id, "#proposalNotesContainer").hide();
+				 $("#editNotes_" + notes.id, "#proposalNotesContainer").hide();
+			 }
+		}else{
+			$("#writeNotes" , "#proposalNotesContainer").val('');
+	    	showProposalNotes();
+		}
+	}
+}
+/**
+ * Resets the fields of the notes grid.
+ */
+function resetNotesFields(){
+	clearCSSErrors("#proposalNotesContainer");
+	$("#writeNotes" , "#proposalNotesContainer").val('');
+	$("#notesSaveData", "#proposalNotesContainer").show();
+	$("#notesResetData", "#proposalNotesContainer").show();
+	$("#notesUpdateData", "#proposalNotesContainer").hide();
+	$("#notesCancelData", "#proposalNotesContainer").hide();
+	$("#notesId", "#proposalNotesContainer").val('0');
+	showHideSaveNotesInSalesForceBtn();
+	jQuery("textarea", "#proposalNotesContainer").change();
+	$("#writeNotes" , "#proposalNotesContainer").focus();
+}
+
+/*
+Get proposal notes by proposal Id
+*/
+function showProposalNotes(){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.dataType = 'html';
+	ajaxReq.url = "./proposalWorkflow/getProposalNotes.action?proposalId="+ $("#basicInfoParentDiv #id").val();
+	ajaxReq.success = function(result, status, xhr){
+		 $('#notesContainer','#basicInfoParentDiv').html(result);
+		 showHideNotesFields();
+		 jQuery("#writeNotes", "#proposalNotesContainer").limiter(3072, $("#charsRemainingProposalNotes", "#proposalNotesContainer"));
+	};
+	ajaxReq.submit();
+}
+
+function showHideNotesFields(){
+	 if($("#assignedToCurrentUser","#basicInfoParentDiv").val() == "false"){
+		 $("#notesOperator", "#proposalNotesContainer").hide();
+		 $("#notesAction", "#proposalNotesContainer").hide();
+	 }else{
+		 if("EXPIRED" == $("#proposalStatus" , "#basicInfoParentDiv").val()){
+			 $("#notesOperator", "#proposalNotesContainer").hide();
+			 $("#notesAction", "#proposalNotesContainer").hide();
+		 }else{
+			 $("#notesOperator", "#proposalNotesContainer").show();
+			 $("#notesAction", "#proposalNotesContainer").show();
+		 }
+	 }
+	 showHideSaveNotesInSalesForceBtn();
+}
+
+function showHideSaveNotesInSalesForceBtn(){
+	var  notesId = $("#notesId","#proposalNotesContainer").val();
+	if($("#salesforceID","#basicInfoParentDiv").val() == "" || $("#pushedInSalesforce_" + notesId, "#proposalNotesContainer").val() == 'true'){
+		 $("#saveNotesInSalesForce", "#proposalNotesContainer").hide();
+	 } else {
+		 $("#saveNotesInSalesForce", "#proposalNotesContainer").show();
+	 }
+}
+
+/**
+ * Get advertiser type by advertiserId and show and hide key advertiser info
+ * @return
+ */
+function getAdvertiserType(){
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.url = "./proposalWorkflow/isSpecialAdvertiser.action?advertiserId="+ $("#advertiserName", "#basicInfoParentDiv").val();
+	ajaxReq.success = function(result, status, xhr){
+		var specialAdvertiser = result.objectMap.gridKeyColumnValue;
+		if(specialAdvertiser){
+			$("#specialAdvertiserImg", "#basicInfoParentDiv").show();
+		}else{
+			$("#specialAdvertiserImg", "#basicInfoParentDiv").hide();
+		}
+		$("#specialAdvertiser", "#basicForm").val(specialAdvertiser);
+	};
+	ajaxReq.submit();
+}
+
+function operationCancel() {
+	clearCSSErrors("#basicForm");
+	$("#sfIdSave","#basicInfoParentDiv").hide();
+	$("#sfIdEdit","#basicInfoParentDiv").show();
+	$("#modifySalesforceId", "#basicInfoParentDiv").addClass("input-textbox-readonly");
+	$("#modifySalesforceId", "#basicInfoParentDiv").attr("readonly", true);
+}
+
+function showHideField(operation, obj){
+	$(obj).hide();
+	if(operation == "EDIT"){
+		$("#sfIdSave","#basicInfoParentDiv").show();
+		$("#sfIdClose","#basicInfoParentDiv").show();
+		$("#modifySalesforceId","#basicInfoParentDiv").focus();
+		$("#modifySalesforceId", "#basicInfoParentDiv").removeClass("input-textbox-readonly");
+		$("#modifySalesforceId", "#basicInfoParentDiv").attr("readonly", false);
+	} else if(operation == "CANCEL"){
+		operationCancel();
+		$("#modifySalesforceId","#basicInfoParentDiv").val($("#salesforceID","#basicInfoParentDiv").val());
+	}
+}
+
+function mapSalesforceId() {
+	var ajaxReq = new AjaxRequest();
+	ajaxReq.type = 'POST';
+	ajaxReq.url = "./proposalWorkflow/mapSalesforceId.action";
+	ajaxReq.data = {
+			newSalesforceId: $("#modifySalesforceId", "#basicInfoParentDiv").val(),
+			proposalId: $("#basicInfoParentDiv #id").val()
+	};
+	ajaxReq.success = function(result, status, xhr){
+		validatingNewSfMapping(result);
+	};ajaxReq.submit();
+}
+
+function validatingNewSfMapping(result) {
+	clearCSSErrors("#basicForm");
+	if(result.objectMap.gridKeyColumnValue == 'SUCCESS'){
+		jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.generic.newSalesforceIdMapped']});
+		window.location.replace($("#contextPath").val() + "/manageProposal.action?_flowId=workOnProposal&proposalId="+$("#basicInfoParentDiv #id").val());
+	} else {
+		$("#modifySalesforceId", "#basicInfoParentDiv").addClass("errorElement errortip").attr("title", resourceBundle[result.objectMap.gridKeyColumnValue] + '<BR><b>Help:</b> ' + "Please enter valid data in the field.");
+		renderErrorQtip("#basicInfoParentDiv");
+	}
+}

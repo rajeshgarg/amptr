@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:sec="http://www.springframework.org/schema/security" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+	http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.3.xsd
+	http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<sec:http auto-config="true" access-denied-page="/accessdenied.action" use-expressions="true">
+		<sec:intercept-url pattern="/loginpage.action" access="permitAll()" />
+		<sec:intercept-url pattern="/loginfailed.action" access="permitAll()" />
+		<sec:intercept-url pattern="/accessdenied.action" access="permitAll()" />
+		<sec:intercept-url pattern="/invalidSession.action" access="permitAll()" />
+		<sec:intercept-url pattern="/healthCheck.action" access="permitAll()" />
+		<sec:intercept-url pattern="/reservations/displayReservationCalendar.action" access="permitAll()" />
+		<sec:intercept-url pattern="/reservations/getSalesCalendarResult.action" access="permitAll()" />
+		<sec:intercept-url pattern="/reservations/getProposedLineItems.action" access="permitAll()" />
+		<sec:intercept-url pattern="/homepage/initResourceBundle.action" access="permitAll()" />
+		<sec:intercept-url pattern="/managepackage/getSalesTargetForProduct.action" access="permitAll()" />
+				
+		<sec:intercept-url pattern="/css/**" access="permitAll()" />
+		<sec:intercept-url pattern="/images/**" access="permitAll()" />
+		<sec:intercept-url pattern="/heartbeat/**" access="permitAll()" />
+		<sec:intercept-url pattern="/js/**" access="permitAll()" />
+		
+		<sec:intercept-url pattern="/**" access="hasRole('USER')" />
+		
+		<sec:form-login login-page="/loginpage.action" default-target-url="/homepage/viewdetails.action" 
+			authentication-failure-url="/loginfailed.action" always-use-default-target="false" />
+		
+		<sec:logout logout-success-url="/loginpage.action" invalidate-session="true"/>
+		
+		<sec:session-management invalid-session-url="/invalidSession.action" />
+	</sec:http>
+ 
+	<sec:authentication-manager>
+		<sec:authentication-provider ref="authenticationProvider"/>
+	</sec:authentication-manager>
+
+	<bean id="authenticationProvider" class="com.nyt.mpt.util.security.AMPTAuthenticationProvider">
+		<property name="authenticators" ref="amptAuthenticator"></property>
+		<property name="userService" ref="userService" />
+	</bean>
+	
+	<util:list id="amptAuthenticator" list-class="java.util.LinkedList">
+		<ref bean="${ldap.authenticator}"/>
+	</util:list>
+	
+	<bean id="nytLdapAuthenticator" class="com.nyt.mpt.util.ldap.LdapAuthenticator" lazy-init="true">
+		<property name="ldapTemplate" ref="ldapTemplate"/>
+	</bean>
+		
+	<bean id="tavantLdapAuthenticator" class="com.nyt.mpt.util.ldap.TavantLdapAuthenticator" lazy-init="true">
+		<property name="ldapTemplate" ref="ldapTemplate"/>
+	</bean>
+</beans>
+

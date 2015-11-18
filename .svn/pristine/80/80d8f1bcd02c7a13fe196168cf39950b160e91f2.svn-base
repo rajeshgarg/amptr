@@ -1,0 +1,176 @@
+/**
+ * 
+ */
+package com.nyt.mpt.domain;
+
+import java.io.Serializable;
+import java.sql.Date;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.FetchType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.Table;
+
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.hibernate.annotations.Immutable;
+import org.hibernate.annotations.Type;
+import org.hibernate.annotations.Where;
+
+/**
+ * This <code>Product</code> class includes all the attributes related to Product
+ * and their getter and setter. The attributes have mapping with
+ * <code>PRODUCT</code> table in the database
+ * 
+ * @author surendra.singh
+ */
+@Entity
+@Immutable
+@Table(name = "PRODUCT")
+@Where(clause = "DELETE_DATE is null")
+@Cache(usage = CacheConcurrencyStrategy.READ_ONLY)
+public class Product implements Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	private long id;
+
+	private ProductType typeName;
+
+	private String name;
+
+	private ProductClass className;
+
+	private String note;
+
+	private String description;
+
+	private String displayName;
+
+	private String status;
+
+	private Date deleteDate;
+
+	private String reservable;
+	
+	private Long availsSytemId;
+	
+	private boolean isSyncAds;
+	
+
+	@Id
+	@Column(name = "SOS_PRODUCT_ID")
+	public long getId() {
+		return id;
+	}
+
+	public void setId(long id) {
+		this.id = id;
+	}
+
+	@Column(name = "PRODUCT_BASE", nullable = false)
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	@Column(name = "PRODUCT_NOTE", nullable = false)
+	public String getNote() {
+		return note;
+	}
+
+	public void setNote(String note) {
+		this.note = note;
+	}
+
+	@Column(name = "DESCRIPTION", nullable = false)
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
+	}
+
+	@Column(name = "AD_UNIT", nullable = false)
+	public String getDisplayName() {
+		return displayName;
+	}
+
+	public void setDisplayName(String displayName) {
+		this.displayName = displayName;
+	}
+
+	@Column(name = "STATUS", nullable = false)
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+
+	@Column(name = "DELETE_DATE", nullable = false)
+	public Date getDeleteDate() {
+		return deleteDate;
+	}
+
+	public void setDeleteDate(Date deleteDate) {
+		this.deleteDate = deleteDate;
+	}
+
+	@ManyToOne(targetEntity = ProductType.class, fetch = FetchType.LAZY, cascade = { CascadeType.ALL })
+	@JoinColumn(name = "SOS_PRODUCT_TYPE_ID", nullable = false, updatable = false, insertable = false)
+	public ProductType getTypeName() {
+		return typeName;
+	}
+
+	public void setTypeName(ProductType typeName) {
+		this.typeName = typeName;
+	}
+
+	@ManyToOne(targetEntity = ProductClass.class, fetch = FetchType.LAZY, cascade = { CascadeType.ALL })
+	@JoinColumn(name = "SOS_PRODUCT_CLASS_ID", nullable = false, updatable = false, insertable = false)
+	public ProductClass getClassName() {
+		return className;
+	}
+
+	public void setClassName(ProductClass className) {
+		this.className = className;
+	}
+
+	@Column(name = "IS_RESERVABLE")
+	public String getReservable() {
+		return reservable;
+	}
+
+	public void setReservable(String reservable) {
+		this.reservable = reservable;
+	}
+
+	@Column(name = "SOS_AVAILS_SYSTEM_ID")
+	public Long getAvailsSytemId() {
+		return availsSytemId;
+	}
+
+	public void setAvailsSytemId(Long availsSytemId) {
+		this.availsSytemId = availsSytemId;
+	}
+
+	@Type(type = "yes_no")
+	@Column(name = "IS_SYNC_ADS")
+	public boolean isSyncAds() {
+		return isSyncAds;
+	}
+
+	public void setSyncAds(boolean isSyncAds) {
+		this.isSyncAds = isSyncAds;
+	}
+}

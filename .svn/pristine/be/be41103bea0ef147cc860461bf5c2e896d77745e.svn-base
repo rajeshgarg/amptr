@@ -1,0 +1,365 @@
+/**
+ * 
+ */
+package com.nyt.mpt.service.impl;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.log4j.Logger;
+import org.hibernate.Hibernate;
+
+import com.nyt.mpt.dao.IPackageDAO;
+import com.nyt.mpt.dao.IProposalDAO;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.LineItemSalesTargetAssoc;
+import com.nyt.mpt.domain.LineItemTarget;
+import com.nyt.mpt.domain.Package;
+import com.nyt.mpt.service.IPackageService;
+import com.nyt.mpt.service.IPricingCalculator;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.NumberUtil;
+import com.nyt.mpt.util.PaginationCriteria;
+import com.nyt.mpt.util.SortingCriteria;
+import com.nyt.mpt.util.StringUtil;
+import com.nyt.mpt.util.filter.FilterCriteria;
+import com.nyt.mpt.util.filter.RangeFilterCriteria;
+import com.nyt.mpt.util.security.SecurityUtil;
+import com.nyt.mpt.domain.PackageSalesCategoryAssoc;
+
+/**
+ * This service class is used for Package operation.
+ *
+ * @author surendra.singh
+ *
+ */
+public class PackageService implements IPackageService {
+
+	private static final Logger LOGGER = Logger.getLogger(PackageService.class);
+
+	private IPackageDAO packageDAO;
+
+	private IProposalDAO proposalDao;
+	
+	private IPricingCalculator pricingCalculator;
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageService#getPackageList()
+	 */
+	@Override
+	public List<Package> getFilteredPackageList(final FilterCriteria filterCriteria, final PaginationCriteria pgCriteria,
+			final SortingCriteria sortCriteria) {
+		return packageDAO.getFilteredPackageList(filterCriteria, pgCriteria, sortCriteria);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageListCount(com.nyt.mpt.util.FilterCriteria)
+	 */
+	@Override
+	public int getFilteredPackageListCount(final FilterCriteria filterCriteria) {
+		return packageDAO.getFilteredPackageListCount(filterCriteria);
+	}
+
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageService#deletePackage(com.nyt.mpt.adpackage.AdPackage)
+	 */
+	@Override
+	public long deletePackage(final Package adPackage) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Deleting Package with id: " + adPackage.getId());
+		}
+		final Package adPackageDb = getPackageById(adPackage.getId());
+		adPackageDb.setActive(false);
+		return packageDAO.savePackage(adPackageDb);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getPackageById(long)
+	 */
+	@Override
+	public Package getPackageById(final long packageID) {
+		final Package adPackage = packageDAO.getPackageById(packageID);
+		Hibernate.initialize(adPackage);
+		Hibernate.initialize(adPackage.getPackagelineItemSet());
+		for (LineItem lineItem : adPackage.getPackagelineItemSet()) {
+			Hibernate.initialize(lineItem.getGeoTargetSet());
+			Hibernate.initialize(lineItem.getLineItemSalesTargetAssocs());
+		}
+		return adPackage;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageService#savePackage(com.nyt.mpt.adpackage.AdPackage)
+	 */
+	@Override
+	public long savePackage(final Package adPackage) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving Package with id: " + adPackage.getId());
+		}
+		if (adPackage.getId() == 0) {
+			return packageDAO.savePackage(adPackage);
+		} else {
+			final Package adPackageDb = getPackageById(adPackage.getId());
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("PackageId: " + adPackage.getId());
+			}
+			adPackageDb.setName(adPackage.getName());
+			adPackageDb.setOwner(adPackage.getOwner());
+			adPackageDb.setBreakable(adPackage.isBreakable());
+			adPackageDb.setBudget(adPackage.getBudget());
+			adPackageDb.setValidFrom(adPackage.getValidFrom());
+			adPackageDb.setValidTo(adPackage.getValidTo());
+			adPackageDb.setComments(adPackage.getComments());
+			final List<PackageSalesCategoryAssoc> salesCategoryAssocs = adPackageDb.getPackageSalesCategoryAssoc();
+			for (PackageSalesCategoryAssoc packageSalesCategoryAssocs : salesCategoryAssocs) {
+				packageDAO.deleteSalesCategoryAssoc(packageSalesCategoryAssocs);
+			}
+			adPackageDb.setPackageSalesCategoryAssoc(adPackage.getPackageSalesCategoryAssoc());
+			
+			return packageDAO.savePackage(adPackageDb);
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#isDuplicatePackageName(java.lang.String, long)
+	 */
+	@Override
+	public boolean isDuplicatePackageName(final String packageName, final long packageID) {
+		return packageDAO.isDuplicatePackageName(packageName, packageID);
+	}
+
+	/*
+	 * Methods for PackageLineItem
+	 */
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageLineItemsService#deleteLineItems(com.nyt.mpt.adpackage.AdPackageLineItems)
+	 */
+	@Override
+	public void deleteLineItems(final String lineItemIds) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Deleting Line Item with id: " + lineItemIds);
+		}
+		for (String lineItemId : lineItemIds.split(ConstantStrings.COMMA)) {
+			final LineItem packageLineItems = packageDAO.getLineItemById(Long.valueOf(lineItemId));
+			packageLineItems.setActive(false);
+			packageDAO.updateLineItems(packageLineItems);
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageLineItemsService#saveLineItems(com.nyt.mpt.adpackage.AdPackageLineItems)
+	 */
+	@Override
+	public Long saveLineItems(final LineItem lineItem) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving Line Item with id: " + lineItem.getLineItemID());
+		}
+		Long returnId = 0L;
+		if (lineItem.getLineItemID() == 0) {
+			returnId = packageDAO.saveLineItems(lineItem);
+		} else {
+			final LineItem lineItemDB = packageDAO.getLineItemById(lineItem.getLineItemID());
+			lineItemDB.setComments(lineItem.getComments());
+			lineItemDB.setFlight(lineItem.getFlight());
+			lineItemDB.setSosProductClass(lineItem.getSosProductClass());
+			lineItemDB.setSosProductId(lineItem.getSosProductId());
+			lineItemDB.setProductName(lineItem.getProductName());
+			lineItemDB.setTargetingString(lineItem.getTargetingString());
+			// Clear the line items sales target association and put new list
+			final List<LineItemSalesTargetAssoc> salesTargetAssocs = lineItemDB.getLineItemSalesTargetAssocs();
+			for (LineItemSalesTargetAssoc lineItemSalesTargetAssoc : salesTargetAssocs) {
+				proposalDao.deleteLineItemSalesTargetAssoc(lineItemSalesTargetAssoc);
+			}
+			final Set<LineItemTarget> geoTargetAssocs = lineItemDB.getGeoTargetSet();
+			for (LineItemTarget lineItemTarget : geoTargetAssocs) {
+				proposalDao.deleteProposalGeoTargets(lineItemTarget);
+			}
+			lineItemDB.setLineItemSalesTargetAssocs(lineItem.getLineItemSalesTargetAssocs());
+			lineItemDB.setGeoTargetSet(lineItem.getGeoTargetSet());
+			lineItemDB.setImpressionTotal(lineItem.getImpressionTotal());
+			lineItemDB.setPriceType(lineItem.getPriceType());
+			lineItemDB.setRate(lineItem.getRate());
+			lineItemDB.setTotalInvestment(lineItem.getTotalInvestment());
+			lineItemDB.setAvailsPopulatedDate(lineItem.getAvailsPopulatedDate());
+			lineItemDB.setPlacementName(lineItem.getPlacementName());
+		//	lineItemDB.setSegmentCode(lineItem.getSegmentCode());
+			lineItemDB.setAvails(lineItem.getAvails());
+			lineItemDB.setSov(lineItem.getSov());
+			lineItemDB.setStartDate(lineItem.getStartDate());
+			lineItemDB.setEndDate(lineItem.getEndDate());
+			lineItemDB.setTotalPossibleImpressions(lineItem.getTotalPossibleImpressions());
+			lineItemDB.setSpecType(lineItem.getSpecType());
+			lineItemDB.setLineItemSequence(lineItem.getLineItemSequence());
+			lineItemDB.setRateCardPrice(lineItem.getRateCardPrice());
+			lineItemDB.setPriceCalSummary(lineItem.getPriceCalSummary());
+			lineItemDB.setSor(lineItem.getSor());
+			lineItemDB.setProductType(lineItem.getProductType());
+			lineItemDB.setRatex(lineItem.isRatex());
+			returnId = packageDAO.updateLineItems(lineItemDB);
+		}
+		return returnId;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageLineItemsService#getLineItemsListForPackage(java.lang.Long)
+	 */
+	@Override
+	public List<LineItem> getFilteredPackageLineItems(final long packageId, final FilterCriteria filterCriteria, final PaginationCriteria pgCriteria,
+			final SortingCriteria sortCriteria) {
+		return packageDAO.getFilteredPackageLineItems(packageId, filterCriteria, pgCriteria, sortCriteria);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageLineItemsCount(long, com.nyt.mpt.util.FilterCriteria)
+	 */
+	@Override
+	public int getFilteredPackageLineItemsCount(final long packageId, final FilterCriteria filterCriteria) {
+		return packageDAO.getFilteredPackageLineItemsCount(packageId, filterCriteria);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageLineItemsService#getLineItemById(java.lang.Long)
+	 */
+	@Override
+	public LineItem getLineItemById(final Long lineItemId) {
+		return packageDAO.getLineItemById(lineItemId);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageList(java.util.List, com.nyt.mpt.util.PaginationCriteria, com.nyt.mpt.util.SortingCriteria)
+	 */
+	@Override
+	public List<Package> getFilteredPackageList(final List<RangeFilterCriteria> filterCriteriaLst, final PaginationCriteria pageCriteria,
+			final SortingCriteria sortingCriteria) {
+		return packageDAO.getFilteredPackageList(filterCriteriaLst, pageCriteria, sortingCriteria);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageListCountHavingLineItems(java.util.List)
+	 */
+	@Override
+	public Integer getFilteredPackageListCountHavingLineItems(final List<RangeFilterCriteria> filterCriteriaLst) {
+		return packageDAO.getFilteredPackageListCountHavingLineItems(filterCriteriaLst);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageListHavingLineItems(java.util.List, com.nyt.mpt.util.PaginationCriteria, com.nyt.mpt.util.SortingCriteria)
+	 */
+	@Override
+	public List<Package> getFilteredPackageListHavingLineItems(final List<RangeFilterCriteria> filterCriteriaLst,
+			final PaginationCriteria pageCriteria, final SortingCriteria sortingCriteria) {
+		return packageDAO.getFilteredPackageListHavingLineItems(filterCriteriaLst, pageCriteria, sortingCriteria);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getNextSequenceNoForLineItem(long)
+	 */
+	@Override
+	public int getNextSequenceNoForLineItem(final long packageId) {
+		final int maxSequence = packageDAO.getMaxSequenceNoForLineItem(packageId);
+		return (maxSequence == 999) ? maxSequence : maxSequence + 1;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getCompletePackageByID(long)
+	 */
+	@Override
+	public long createPackageCloneByID(final long packageId) {
+		final Package adPackage = createNewPackageFromExisting(packageDAO.getCompletePackageByID(packageId));
+		return packageDAO.savePackage(adPackage);
+	}
+
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#saveUpdatedPackage(com.nyt.mpt.domain.Package)
+	 */
+	@Override
+	public long updatedPackage(final Package adPackage) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving Package with id: " + adPackage.getId());
+		}
+		return packageDAO.savePackage(adPackage);
+	}
+
+	/**
+	 * Method creates a new Package from Existing one
+	 * by changing the name and setting the id to null
+	 * @param adPackage
+	 * @return
+	 */
+	private Package createNewPackageFromExisting(final Package adPackage) {
+		adPackage.setId(0);
+		adPackage.setOwner(SecurityUtil.getUser());
+		adPackage.setName(StringUtil.generatePackageName(adPackage.getName()));
+		final Set<LineItem> packageLineItem = adPackage.getPackagelineItemSet();
+		for (LineItem lineItem : packageLineItem) {
+			lineItem.setLineItemID(null);
+			lineItem.setVersion(0);
+			lineItem.setProposalVersion(null);
+			final Set<LineItemTarget> geoTargetSet = lineItem.getGeoTargetSet();
+			for (LineItemTarget lineItemTarget : geoTargetSet) {
+				lineItemTarget.setId(null);
+			}
+			final List<LineItemSalesTargetAssoc> targetList = lineItem.getLineItemSalesTargetAssocs();
+			for (LineItemSalesTargetAssoc lineItemSalesTargetAssoc : targetList) {
+				lineItemSalesTargetAssoc.setId(null);
+			}
+		}
+		final List<PackageSalesCategoryAssoc> salesCategoryAssoc = adPackage.getPackageSalesCategoryAssoc();
+		for (PackageSalesCategoryAssoc packageSalesCategory : salesCategoryAssoc) {
+			packageSalesCategory.setId(0);
+		}
+		return adPackage;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#updateAllLineItemsPrice(java.lang.Long[])
+	 */
+	@Override
+	public void updateAllLineItemsPrice(final Long[] lineItems) {
+		if (lineItems != null) {
+			List<LineItem> lineItemLst = proposalDao.getLineItemsOnBaseOfId(lineItems);
+			for (LineItem lineItem : lineItemLst) {
+				if (ConstantStrings.LINE_ITEM_PRICE_TYPE_CPM.equals(lineItem.getPriceType()) || ConstantStrings.LINE_ITEM_PRICE_TYPE_PRE_EMPTIBLE.equals(lineItem.getPriceType()) || ConstantStrings.LINE_ITEM_PRICE_TYPE_CUSTOM_UNIT.equals(lineItem.getPriceType()) || ConstantStrings.LINE_ITEM_PRICE_TYPE_ADDED_VALUE.equals(lineItem.getPriceType())) {
+					Hibernate.initialize(lineItem.getPackageObj());
+					Map<String, Object> pricingCalculatorMap = pricingCalculator.getLineItemPrice(lineItem, null, ConstantStrings.NET);
+					if (pricingCalculatorMap != null && !pricingCalculatorMap.isEmpty()) {
+						Double price = (Double) pricingCalculatorMap.get("price");
+						price = (price == null || price == 0.0) ? 0 : price;
+						if (price != null && price > 0.0) {
+							boolean israteCardRounded = (Boolean) pricingCalculatorMap.get("rateCardRounded");
+							if(!israteCardRounded ){						
+								price = NumberUtil.getHalfCentFormatedValue(price);
+							}
+						}
+						lineItem.setRateCardPrice(price);
+						if(lineItem.isRatex()){
+							lineItem.setRatex((price == null || price == 0.0 ) ? false : true);
+						}
+						String priceCalSummary = pricingCalculatorMap.get("calculatorStep") == null ? ConstantStrings.EMPTY_STRING : pricingCalculatorMap.get("calculatorStep").toString();
+						lineItem.setPriceCalSummary(priceCalSummary);
+						if(lineItem.getRateCardPrice()!=0){
+							lineItem.setRatex(lineItem.isRatex());
+						}
+						packageDAO.updateLineItems(lineItem);
+					}
+				}
+			}
+		}
+	}
+
+	public void setPackageDAO(final IPackageDAO packageDAO) {
+		this.packageDAO = packageDAO;
+	}
+
+	public void setProposalDao(final IProposalDAO proposalDao) {
+		this.proposalDao = proposalDao;
+	}
+
+	public void setPricingCalculator(IPricingCalculator pricingCalculator) {
+		this.pricingCalculator = pricingCalculator;
+	}
+	
+}

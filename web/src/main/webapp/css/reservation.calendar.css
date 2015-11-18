@@ -1,0 +1,62 @@
+/* Reservation Calendar CSS */
+body{background-color:#EAF1FD;}
+#lineItemDetail table tr td{padding:0 0 10px 0;}
+.proposal-primary-info dfn a{cursor:pointer;color:#003CFF;font-weight:700}
+.proposal-primary-info dfn a:hover{color:#268CFF;text-decoration:underline;}
+.label-value{margin-right:8px;width:28%;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top;}
+.target-string-label{vertical-align:top;display:inline-block;width:86%;max-height:53px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.calendar-lineItem-detail{padding:6px 10px 0;font-size:12px;width:72%;margin:10px auto 0;border-radius:5px;}
+.calendar-container{font-size:12px;padding:0 14%;}
+.calendar-view{margin-top:20px;margin-bottom:10px}
+.reservation-detail{font-size:12px;margin:0 23px;border:1px solid #DDD;padding:15px;box-shadow:1px 1px 6px 1px #999;position:absolute;background:#FFF;top:125px;z-index:99;}
+@media screen and (-webkit-min-device-pixel-ratio:0) { 
+	.reservation-detail{top:132px;}
+}
+.close-detail{cursor:pointer;position:absolute;top:-12px;right:-13px;width:30px;height:30px;background:transparent url('../images/fancybox.png') -40px 0px;}
+.scroll-accord-content{overflow-y:auto;margin-top:5px}
+.proposal-info{margin:5px;box-shadow:2px 2px 4px 1px #aaa;}
+.proposal-primary-info{border:1px solid #9fc1f8;border-bottom:0;border-top-left-radius:4px;border-top-right-radius:4px}
+.proposal-primary-info p{padding:5px 0 5px 10px;}
+.proposal-primary-info p dfn{display:inline-block;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proposal-primary-info p label{font-weight:700;display:inline-block;margin-right:5px}
+.reservation-table{text-align:center;border-collapse:collapse;border:1px solid #9fc1f8;table-layout:fixed;}
+.reservation-table thead tr th,.reservation-table tbody tr td{border:1px solid #9fc1f8;padding:3px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.reservation-table thead tr{background:#D2E5FF;font-weight:700;}
+.reservation-table tbody tr:nth-child(2n){background:#f1f1f1;}
+.reservation-table tbody tr td:nth-child(2),.reservation-table tbody tr td:nth-child(3){text-align:left;padding-left:10px;}
+.reservation-detail-headr{padding: 6px;background: url("../images/Main-bar-prop.png") repeat-x scroll 3px 2px / 25px 25px transparent;border: 0 solid #BABCBC !important;text-indent: 3px !important;}
+.cal-date-data{width:100%;display:inline-block;margin-left:1px;margin-bottom:1px;}
+.cal-date-chk{background:url("../images/success.png") no-repeat 0 0;background-size:16px 16px;width:16px;height:16px;display:inline-block;position:absolute;bottom:2px;right:24px;float:right;}
+#calendarDiv{font-size:12px;}
+
+#edit-proposal-container .ui-accordion{margin-right:4px;width:auto}
+#edit-proposal-container .fc-ltr .fc-event-hori.fc-event-end,#edit-proposal-container .fc-rtl .fc-event-hori.fc-event-start{height:88px;}
+#edit-proposal-container .fc-content{background:#fff}
+#edit-proposal-container .fc-grid th{padding:8px 0;background:url("images/bg-proposal-header.jpg") repeat-x scroll 0 0 transparent;color: #FFF;}
+#edit-proposal-container .fc-header-title h2{font-size:16px;}
+#edit-proposal-container .fc-state-default{background:url("images/bg-proposal-header.jpg") repeat-x scroll 0 0 transparent;margin-right: -3px;}
+#edit-proposal-container .select-list-view{background:url("../images/listview-normal.png") no-repeat scroll 0 0 transparent;margin-right:-4px;width:21px;height:25px;}
+#edit-proposal-container .select-list-view:hover{background:url("../images/listview-selected.png") no-repeat scroll 0 0 transparent;}
+#edit-proposal-container .select-cal-view{background:url("../images/gridview-selected.png") no-repeat scroll 0 0 transparent;margin-right:-4px;width:21px;height:25px;}
+#edit-proposal-container .select-cal-view:hover{background:url("../images/gridview-selected.png") no-repeat scroll 0 0 transparent;}
+#edit-proposal-container .fc-border-separate{border:1px solid #4A84CE;}
+#edit-proposal-container .fc-grid .fc-day-number{font-size:11px;font-weight:700;font-style:italic;}
+#edit-proposal-container h1{background:#4a84ce url(../images/Main-bar.png) 50% 50% repeat-x;padding:4px;font-size:12px;}
+#edit-proposal-container .fc-widget-content{border:1px solid #98B8DE;}
+#edit-proposal-container .fc-day-header{border:1px solid #fff;}
+.cal-email-chk {background: url("../images/not-allowed.png") no-repeat 0 0;background-size: 16px 16px;width: 16px;height: 16px;display: inline-block;position: absolute;bottom: 2px;right: 2px;float: right;}
+.select-list-view-btn{background: url("../images/listview-normal.png") no-repeat scroll 0 0 transparent;background-size:100% 88%;border-radius: 5px 5px 9px 5px; display: inline-block;height: 28px;margin-right: 15px;cursor:pointer;width: 35px;}
+.calendar-box .fc-ltr .fc-event-hori.fc-event-end, .calendar-box .fc-rtl .fc-event-hori.fc-event-start{height:56px;}
+
+/*List view table*/
+#listViewData #reservationListViewContainer{margin:-10px auto 10px;width:72%;}
+.reservation-detail #reservationListViewContainer{overflow-y:auto;height:690px;margin:0 auto 10px;width:72%;}
+#reservationListView{width:100%;border:1px solid #cbd3e1;border-collapse:collapse;background:#fff;margin-bottom: 10px;}
+.reservation-detail #reservationListViewContainer{overflow-y:auto;height:98%;margin:0 auto 10px;width:80%;}
+#reservationListView td{border:1px solid #ccc;padding:6px;}
+#reservationListView tr.date-header{background:#cbd3e1;font-weight:700;}
+#reservationListView tr.table-name-header{background:#e8edf4;font-weight:700;}
+#reservationListView tr.table-col-header{background:#f3f6fb;font-weight:700;}
+#reservationListView td.total-sor{font-weight:700}
+.toggle-views{margin-right:10px;display:inline-block;}
+.toggle-month{display:inline-block;}

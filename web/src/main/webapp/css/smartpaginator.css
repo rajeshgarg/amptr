@@ -1,0 +1,96 @@
+.pager
+{
+	padding: 5px 0;
+	position: relative;
+	background:#C5DDFF;
+	overflow: hidden;
+}
+.pager div.short
+{
+	float: right;
+	margin: 0;
+	padding: 0;	
+	width: 78px;
+}
+.pager div.short input
+{
+	width: 28px;
+	margin-left: 5px;
+	float: left;
+}
+.pager div.short input[type="button"] {
+	height: 23px;
+	background: #5C93D8 !important;
+	border: 0;
+	color: #fff;
+	cursor:pointer;
+	border-radius: 4px;
+}
+.pager div.short input[type="button"]:hover {
+	background: #0C54BC !important;
+}
+.pager ul
+{
+	list-style: none;
+	padding: 0;
+	float: left;
+	margin:2px;
+}
+.pager ul li
+{
+	display: inline;
+	margin-left: 3px;
+	float:left;	
+}
+.pager ul li a
+{
+	text-decoration: none;
+	display: inline-table;
+	width: 20px;
+	height: 15px;
+	text-align: center;
+	border-radius: 4px;
+	padding: 5px 0 0 0;
+}
+.pager span
+{
+	margin-left: 4px;
+	color: #000;
+	float: left;
+	padding-top:6px;
+}
+.blue.normal
+{
+	background-color: #5C93D8;
+	color: #fff;
+}
+.blue.active
+{
+	background-color: #fff;
+	color: #003cff;
+}
+.blue a.normal:hover
+{
+	background-color: #fff;
+	color: #003cff;
+}
+.pager .prev {
+	background: url("images/previous.png") no-repeat center right;
+	padding:19px 10px 4px 9px;
+	float: left;
+}
+.pager .next {
+	background: url("images/next.png") no-repeat center right;
+	padding:19px 10px 4px 9px;
+	float: left;
+}
+.pager .first {
+	background: url("images/first.png") no-repeat center right;
+	padding:19px 10px 4px 9px;
+	float: left;
+}
+.pager .last {
+	background: url("images/last.png") no-repeat center right;
+	padding:19px 10px 4px 9px;
+	float: left;
+}

@@ -1,0 +1,450 @@
+/**
+ * 
+ */
+package com.nyt.mpt.service.impl;
+
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.nyt.mpt.dao.IProposalDAO;
+import com.nyt.mpt.dao.ISosIntegrationDao;
+import com.nyt.mpt.domain.CountryRegionMap;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.LineItemSalesTargetAssoc;
+import com.nyt.mpt.domain.LineItemTarget;
+import com.nyt.mpt.domain.ProductCreativeAssoc;
+import com.nyt.mpt.domain.Proposal;
+import com.nyt.mpt.domain.sos.LineItemTargeting;
+import com.nyt.mpt.domain.sos.OrderLineItem;
+import com.nyt.mpt.domain.sos.SalesOrder;
+import com.nyt.mpt.domain.sos.SosNotes;
+import com.nyt.mpt.domain.sos.SosUser;
+import com.nyt.mpt.domain.sos.TargetElement;
+import com.nyt.mpt.service.IProductService;
+import com.nyt.mpt.service.IProposalService;
+import com.nyt.mpt.service.ISalesTargetService;
+import com.nyt.mpt.service.ISosIntegrationService;
+import com.nyt.mpt.service.ITargetingService;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.DateUtil;
+import com.nyt.mpt.util.NumberUtil;
+import com.nyt.mpt.util.enums.LineItemPriceTypeEnum;
+import com.nyt.mpt.util.enums.LineItemProductTypeEnum;
+import com.nyt.mpt.util.enums.LineItemViewableCriteriaEnum;
+
+/**
+ * @author amandeep.singh
+ *
+ */
+public class SosIntegrationService implements ISosIntegrationService {
+	
+	private static final long EXTERNAL_NOTE = 9L;
+
+	private static final long PRODUCT_NOTES = 16L;
+
+	private static final Logger LOGGER = Logger.getLogger(SosIntegrationService.class);
+	
+	private static final int ONCE_A_DAY = 5138;
+	private static final long CUSTOM_CLUSTER = 1381L;
+	private static final Long BASEREMNANT = 7L;
+	private static final Long TARGET = 1L;
+	private static final Long PREEMPTIBLE = 2L;
+	private static final Long STANDARD = 1L;
+	private ISosIntegrationDao sosIntegrationDao;
+	private IProposalService proposalService;
+	private IProposalDAO proposalDao;
+	private ISalesTargetService salesTargetService;
+	private ITargetingService targetingService;
+	private IProductService productService;
+	private Long sosUserId;
+	
+	private Map<String, Set<LineItemTarget>> missedTargetingMap = null;// Global variable to store which all Targeting is not pushed
+	List<SosNotes> sosNotesLst = null;
+
+	
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.ISosIntegrationService#createOrder(com.nyt.mpt.domain.SosIntegrationPojo)
+	 */
+	@Override
+	public Map<String, Set<LineItemTarget>> createOrder(Long proposalId) {
+		Proposal proposal = proposalService.getProposalbyIdForSosIntegration(proposalId);
+		Map<Long,Long> AMPT_SOS_LineItem_Map = new HashMap<Long, Long>();
+		missedTargetingMap = new LinkedHashMap<String, Set<LineItemTarget>>();
+		sosNotesLst = new ArrayList<SosNotes>();
+		SalesOrder order = createSalesOrderFromProposal(proposal, AMPT_SOS_LineItem_Map);
+		Long orderId=  sosIntegrationDao.saveOrder(order);
+		if(!sosNotesLst.isEmpty()){
+			LOGGER.info("Adding notes in SOS for orderID:"+orderId);
+			long time = System.currentTimeMillis(); 
+			for (SosNotes notes : sosNotesLst) {				
+				notes.setCreateDate(DateUtil.getSosDateString(new Date(time)));
+				notes.setModifiedDate(DateUtil.getSosDateString(new Date(time)));
+				sosIntegrationDao.saveNotes(notes);
+				time += 1000;
+			}
+		}
+		proposalService.updateProposalOrderId(proposal.getId(), orderId);
+		for(LineItem lineItem : proposal.getDefaultOption().getLatestVersion().getProposalLineItemSet()){
+			if(AMPT_SOS_LineItem_Map.containsKey(lineItem.getLineItemID())){
+				lineItem.setSosLineItemID(AMPT_SOS_LineItem_Map.get(lineItem.getLineItemID()));
+				proposalDao.editLineItemsOfProposal(lineItem);
+			}
+		}
+		return missedTargetingMap;
+	}
+	
+
+	/**
+	 * create new Order object from Proposal
+	 * @param proposal
+	 * @param AMPT_SOS_LineItem_Map 
+	 * @return
+	 */
+	private SalesOrder createSalesOrderFromProposal(Proposal proposal, Map<Long, Long> AMPT_SOS_LineItem_Map) {
+		LOGGER.info("Creating order from Proposal with proposal Id:"+proposal.getId());
+		SalesOrder order = new SalesOrder();
+		order.setCampaignName(proposal.getCampaignName());
+		order.setStartDate(proposal.getStartDate());
+		order.setEndDate(proposal.getEndDate());
+		order.setCurrencyId(proposal.getCurrencyId());
+		order.setAgencyDiscount((ConstantStrings.GROSS.equals(proposal.getPriceType())) ? proposal.getAgencyMargin() : 0);
+		SosUser sosUser = new SosUser();
+		sosUser.setId(sosUserId);
+		order.setOwner(sosUser);
+		order.setModifiedBy(sosUserId);
+		order.setLineItem(createOrderLineItemsFromProposal(proposal,order, AMPT_SOS_LineItem_Map));
+		return order;
+	}
+
+	/**
+	 * Create Order Line Item From Proposal's default option and latest version
+	 * @param proposal
+	 * @param order
+	 * @param AMPT_SOS_LineItem_Map 
+	 * @return
+	 */
+	private Set<OrderLineItem> createOrderLineItemsFromProposal(Proposal proposal, SalesOrder order, Map<Long, Long> AMPT_SOS_LineItem_Map) {
+		boolean isOrderViewable = false;
+		Set<OrderLineItem> orderLineItemSet = new LinkedHashSet<OrderLineItem>();
+		Set<LineItem> proposalLineItems = proposal.getDefaultOption().getLatestVersion().getProposalLineItemSet();
+		/* Following code create map for Products and SalesTargets for a line Item to check whether they are Active or not*/
+		List<Long> salesTargetIds = new ArrayList<Long>();
+		for (LineItem lineItem : proposalLineItems) {
+			for(LineItemSalesTargetAssoc lineItemSalesTarget : lineItem.getLineItemSalesTargetAssocs()){
+				salesTargetIds.add(lineItemSalesTarget.getSosSalesTargetId());
+			}
+		}
+		List<com.nyt.mpt.domain.sos.SalesTarget> salesTargets = salesTargetService.getSOSSalesTargetListByIDs(salesTargetIds.toArray(new Long[0]));
+		Map<Long,com.nyt.mpt.domain.sos.SalesTarget> salesTargetMap = new HashMap<Long,com.nyt.mpt.domain.sos.SalesTarget>();	
+		for (com.nyt.mpt.domain.sos.SalesTarget salesTarget : salesTargets) {
+			salesTargetMap.put(salesTarget.getSalesTargetId(), salesTarget);
+		}
+		/*Code Ends*/
+		for (LineItem lineItem : proposalLineItems) {			
+				if(lineItem.getLineItemSalesTargetAssocs().size() > 1){
+					OrderLineItem orderLineItemParent = createOrderLineItem(lineItem,salesTargetMap, proposal, order, CUSTOM_CLUSTER, false, AMPT_SOS_LineItem_Map);//Creating Custom cluster
+					String clusterTarget = ConstantStrings.EMPTY_STRING;
+					String salesTargetName = ConstantStrings.EMPTY_STRING;
+					for (LineItemSalesTargetAssoc lineItemSalesTargetAssoc : lineItem.getLineItemSalesTargetAssocs()) {
+						OrderLineItem orderLineItem = createOrderLineItem(lineItem,salesTargetMap, proposal, order, lineItemSalesTargetAssoc.getSosSalesTargetId(), true, AMPT_SOS_LineItem_Map);
+						orderLineItem.setParentLineItemId(orderLineItemParent.getLineItemId());
+						salesTargetName = salesTargetMap.get(lineItemSalesTargetAssoc.getSosSalesTargetId()).getSalesTargeDisplayName();
+						salesTargetName = salesTargetName.replaceAll(ConstantStrings.SPACE, ConstantStrings.UNDER_SCORE);
+						clusterTarget = clusterTarget + salesTargetName + ConstantStrings.SPACE;
+						orderLineItemSet.add(orderLineItem);
+					}
+					orderLineItemParent.setClusterTargets(clusterTarget.trim());
+					orderLineItemSet.add(orderLineItemParent);
+				}else{
+					orderLineItemSet.add(createOrderLineItem(lineItem,salesTargetMap, proposal, order, lineItem.getLineItemSalesTargetAssocs().get(0).getSosSalesTargetId(), false, AMPT_SOS_LineItem_Map));
+				}
+				if(lineItem.getViewabilityLevel() == LineItemViewableCriteriaEnum.VEIWABLE.getViewableValue()){
+					isOrderViewable = true;
+				}
+		}
+		order.setViewable(isOrderViewable);
+		return orderLineItemSet;
+	}
+	
+	/**
+	 * Create Order Line Item from Proposal Line Item
+	 * @param lineItem
+	 * @param salesTargetMap
+	 * @param proposal
+	 * @param order
+	 * @param salestargetId
+	 * @param isSplit
+	 * @param AMPT_SOS_LineItem_Map
+	 * @return
+	 */
+	private OrderLineItem createOrderLineItem(LineItem lineItem, Map<Long, com.nyt.mpt.domain.sos.SalesTarget> salesTargetMap, Proposal proposal, SalesOrder order, Long salestargetId, boolean isSplit, Map<Long, Long> AMPT_SOS_LineItem_Map) {
+		OrderLineItem orderLineItem = new OrderLineItem();
+		if(isSplit){
+			LOGGER.info("Creating child Order Line Item for CUSTOM_CLUSTER from proposal lineItem with lineItem Id: "+lineItem.getLineItemID());
+		}else{
+			LOGGER.info("Creating Order Line Item from proposal lineItem with lineItem Id: "+lineItem.getLineItemID());
+		}
+		orderLineItem.setModifiedBy(sosUserId);
+		orderLineItem.setLineItemId(sosIntegrationDao.getLineItemId());
+		orderLineItem.setLineItemName(getLineItemName(lineItem, salesTargetMap));		
+		orderLineItem.setSalesOrder(order);
+		Double totalInvestment = NumberUtil.round(lineItem.getTotalInvestment()/(proposal.getConversionRate() > 0 ? proposal.getConversionRate() : 1),2);		
+		Double cpm = null;
+		if(!LineItemPriceTypeEnum.FLATRATE.getOptionValue().equals(lineItem.getPriceType())){
+			cpm = NumberUtil.round(NumberUtil.round(lineItem.getRate(), 2)/(proposal.getConversionRate() > 0 ? proposal.getConversionRate() : 1),2);
+		}
+		orderLineItem.setGrossRate((LineItemPriceTypeEnum.FLATRATE.getOptionValue().equals(lineItem.getPriceType())) ? lineItem.getTotalInvestment() : lineItem.getRate());
+		if(LineItemPriceTypeEnum.FLATRATE.getOptionValue().equals(lineItem.getPriceType())){
+			orderLineItem.setRate(totalInvestment);
+			orderLineItem.setUnitId(6L);
+		}else{
+			if(ConstantStrings.GROSS.equals(proposal.getPriceType())){				
+				orderLineItem.setRate(NumberUtil.round((cpm - (cpm*proposal.getAgencyMargin())/100),2));
+			}else{
+				orderLineItem.setRate(cpm);
+			}
+		}
+		orderLineItem.setProductId(lineItem.getSosProductId());
+		createSosNotesAndSetVendor(orderLineItem);
+		orderLineItem.setSalesTargetId(salestargetId);
+		orderLineItem.setTargetTypeId(salestargetId == CUSTOM_CLUSTER ? 10L : salesTargetMap.get(salestargetId).getSalesTargetType().getSalestargetTypeId());
+		if(isSplit){
+			orderLineItem.setSplitFlag(1L);
+			orderLineItem.setClusterId(-1L);
+			Double totalQtyExpected = ((double)(lineItem.getImpressionTotal())/(double)lineItem.getLineItemSalesTargetAssocs().size());
+			totalQtyExpected = NumberUtil.round(totalQtyExpected, 0);
+			orderLineItem.setTotalQtyExpected(totalQtyExpected.longValue());
+			orderLineItem.setDailyImpExpected(totalQtyExpected.longValue());
+		}else{
+			orderLineItem.setClusterId(0L);
+			orderLineItem.setTotalQtyExpected(lineItem.getImpressionTotal().longValue());
+			orderLineItem.setDailyImpExpected(lineItem.getImpressionTotal().longValue());
+			AMPT_SOS_LineItem_Map.put(lineItem.getLineItemID(), orderLineItem.getLineItemId());
+		}
+		orderLineItem.setStartDate(lineItem.getStartDate());			
+		orderLineItem.setEndDate(lineItem.getEndDate());
+		orderLineItem.setShareOfReservation(lineItem.getSor());
+		if(LineItemPriceTypeEnum.ADDEDVALUE.getOptionValue().equals(lineItem.getPriceType())){
+			orderLineItem.setBonusFlag(true);
+		}
+		if(LineItemPriceTypeEnum.PREEMPTIBLE.getOptionValue().equals(lineItem.getPriceType())){
+			orderLineItem.setRevenueTypeId(BASEREMNANT);
+			orderLineItem.setPriorityId(PREEMPTIBLE);
+		}else{
+			orderLineItem.setRevenueTypeId(TARGET);
+			orderLineItem.setPriorityId(STANDARD);
+		}
+		orderLineItem.setLineItemTargeting(createOrderLineItemTargeting(orderLineItem,lineItem,isSplit));
+		return orderLineItem;
+	}
+
+	/**
+	 * Method creates a Notes object
+	 * @param orderLineItem
+	 */
+	private void createSosNotesAndSetVendor(OrderLineItem orderLineItem) {
+		List<com.nyt.mpt.domain.sos.Product> prodlst = productService.getSOSProductListByIDs(new Long[]{orderLineItem.getProductId()});
+		if(prodlst != null && !prodlst.isEmpty()){
+			com.nyt.mpt.domain.sos.Product prod = prodlst.get(0);
+			orderLineItem.setVendorId(prod.getVendorid());
+			orderLineItem.setServingVendorId(prod.getVendorid());
+			if(StringUtils.isNotBlank(prod.getNote())){			
+				sosNotesLst.add(createNoteObject(prodlst.get(0).getNote(),PRODUCT_NOTES, orderLineItem.getLineItemId()));
+			}
+		}
+	}
+	
+	private SosNotes createNoteObject(String content, Long noteType, Long parentId){
+		SosNotes notes = new SosNotes();
+		notes.setContent(content);
+		notes.setNoteableType("Item");
+		notes.setNoteTypeId(noteType);//Product Notes
+		notes.setParentId(parentId);
+		notes.setCreatedBy(sosUserId);
+		notes.setModifiedBy(sosUserId);
+		return notes;
+	}
+
+	/**
+	 * Generate Line Item Name for SOS
+	 * {Ad Sizes} in {Sales Targets} SOR:XX  
+	 * @param lineItem
+	 * @param salesTargetMap 
+	 * @return
+	 */
+	private String getLineItemName(final LineItem lineItem, final Map<Long, com.nyt.mpt.domain.sos.SalesTarget> salesTargetMap) {
+		StringBuilder lineItemCommonName = new StringBuilder();
+		String salesTargetName = ConstantStrings.EMPTY_STRING;
+		LOGGER.info("Genertaing Order Line Item Name");
+		List<ProductCreativeAssoc> prodCreativeAssocList = productService.getProductCreativesForTemplates(lineItem);
+		if(prodCreativeAssocList.isEmpty()){
+			lineItemCommonName.append(lineItem.getProductName());
+		}else{
+			for (ProductCreativeAssoc productCreativeAssoc : prodCreativeAssocList) {
+				if(lineItemCommonName.length() > 0){
+					lineItemCommonName.append(ConstantStrings.COMMA).append(ConstantStrings.SPACE);
+				}
+				lineItemCommonName.append(productCreativeAssoc.getCreative().getShortDescriptionForSOS());			
+			}
+		}
+		lineItemCommonName.append(ConstantStrings.SPACE).append(ConstantStrings.IN).append(ConstantStrings.SPACE);
+		for(LineItemSalesTargetAssoc lineItemSalesTargetAssocs : lineItem.getLineItemSalesTargetAssocs()){
+			salesTargetName = salesTargetMap.get(lineItemSalesTargetAssocs.getSosSalesTargetId()).getSalesTargeDisplayName();
+			salesTargetName = salesTargetName.replaceAll(ConstantStrings.SPACE, ConstantStrings.UNDER_SCORE);
+			lineItemCommonName.append(salesTargetName).append(ConstantStrings.COMMA);
+		}
+		lineItemCommonName.deleteCharAt(lineItemCommonName.lastIndexOf(ConstantStrings.COMMA));
+		if(LineItemProductTypeEnum.RESERVABLE.name().equals(lineItem.getProductType().name())){
+			lineItemCommonName.append(ConstantStrings.SPACE);
+			lineItemCommonName.append("SOR").append(ConstantStrings.COLON).append((lineItem.getSor() == null) ? 0D : lineItem.getSor());
+		}
+		if(lineItemCommonName.length() > 80){
+			return lineItemCommonName.substring(0, 80);
+		} else {
+			return lineItemCommonName.toString();
+		}
+	}
+
+	/**
+	 * Create Order Line Item Targeting From Proposals Line Item
+	 * @param orderLineItem
+	 * @param lineItem
+	 * @param isSplit 
+	 * @return
+	 */
+	private Set<LineItemTargeting> createOrderLineItemTargeting(OrderLineItem orderLineItem, LineItem lineItem, boolean isSplit) {
+		Set<LineItemTargeting> targetingSet = new LinkedHashSet<LineItemTargeting>();
+		Map<Long,List<Long>> regionCountryMap = null;
+		Map<Long,Long> countryIds  = new HashMap<Long,Long>();
+		boolean targetingNotPushed = false;
+		LOGGER.info("Creating Order LineItem Target from Proposal LineItem targets");
+		for (LineItemTarget proposalLiTrgt : lineItem.getGeoTargetSet()) {
+			if (!(proposalLiTrgt.getSosTarTypeId() == 33 || proposalLiTrgt.getSosTarTypeId() == 36 || proposalLiTrgt.getSosTarTypeId() == 37 
+					|| proposalLiTrgt.getSosTarTypeId() == 38 || proposalLiTrgt.getSosTarTypeId() == 40 || proposalLiTrgt.getSosTarTypeId() == 41 || proposalLiTrgt.getSosTarTypeId() == 42 
+					|| ConstantStrings.NOT.equalsIgnoreCase(proposalLiTrgt.getNegation()))) {//Condition as Behavioural,Referrer,Browser,OS,Zip,Device Codes not supported by SOS
+				if(proposalLiTrgt.getSosTarTypeId() == 35){//Target Region
+					regionCountryMap = getRegionCountryMap();
+				}
+				for (String elementId : proposalLiTrgt.getSosTarTypeElementId().split(ConstantStrings.COMMA)) {
+					if(proposalLiTrgt.getSosTarTypeId() == 35){//For Target Region Countries will be pushed
+						if(regionCountryMap.containsKey(Long.valueOf(elementId))){
+							for(Long countryId :regionCountryMap.get(Long.valueOf(elementId))){
+								if(!countryIds.containsKey(countryId)){									
+									targetingSet.add(getLineItemTargetingObj(orderLineItem,countryId));
+									countryIds.put(countryId, countryId);
+								}
+							}
+						}
+					}else{
+						if(proposalLiTrgt.getSosTarTypeId() == 8 ){//For  Countries to check duplicacy
+							if(countryIds.containsKey(Long.valueOf(elementId))){
+								continue;
+							}else{
+								countryIds.put(Long.valueOf(elementId), Long.valueOf(elementId));
+							}
+						}						
+						targetingSet.add(getLineItemTargetingObj(orderLineItem,Long.valueOf(elementId)));
+					}
+				}
+			}
+			if (proposalLiTrgt.getSosTarTypeId() == 33 || proposalLiTrgt.getSosTarTypeId() == 36 || proposalLiTrgt.getSosTarTypeId() == 37 
+					|| proposalLiTrgt.getSosTarTypeId() == 38 || proposalLiTrgt.getSosTarTypeId() == 40 || proposalLiTrgt.getSosTarTypeId() == 41 || proposalLiTrgt.getSosTarTypeId() == 42 
+					|| ConstantStrings.NOT.equalsIgnoreCase(proposalLiTrgt.getNegation()) || ConstantStrings.OR.equalsIgnoreCase(proposalLiTrgt.getOperation())){
+				if(proposalLiTrgt.getSosTarTypeId() == 40){
+					orderLineItem.setFrequencyCapType(3L);//For Hours(Frequency Cap)
+					orderLineItem.setFrequencyCapValue(ONCE_A_DAY == Long.valueOf(proposalLiTrgt.getSosTarTypeElementId()) ? 24L : 168L);
+				}else if(!isSplit){
+					String uniqueKey = lineItem.getLineItemID() + "~" + orderLineItem.getLineItemId();
+					if(missedTargetingMap.containsKey(uniqueKey)){
+						missedTargetingMap.get(uniqueKey).add(proposalLiTrgt);
+					}else{
+						Set <LineItemTarget> targetTypeSet = new LinkedHashSet<LineItemTarget>();
+						targetTypeSet.add(proposalLiTrgt);
+						missedTargetingMap.put(uniqueKey, targetTypeSet);
+					}
+					targetingNotPushed = true;
+				}
+			}
+			if(ConstantStrings.OR.equalsIgnoreCase(proposalLiTrgt.getOperation())){
+				break;
+			}			
+		}
+		if(targetingNotPushed){
+			String targetString = lineItem.getTargetingString();
+			targetString = targetString.replaceAll(ConstantStrings.SPACE + ConstantStrings.OR + ConstantStrings.SPACE, "\n"+ConstantStrings.OR+"\n");
+			targetString = "Some of the targeting elements could not be created in SOS. Here is the complete targeting expression:" + targetString;
+			targetString = (targetString.length() > 4000) ? (targetString.substring(0, 3997) + "...") : targetString;
+			sosNotesLst.add(createNoteObject(targetString,EXTERNAL_NOTE, orderLineItem.getLineItemId()));
+		}
+		return targetingSet;
+	}
+	
+	
+	/**
+	 * Returns Line Item Targeting Object
+	 * @param orderLineItem
+	 * @param elementId
+	 * @return
+	 */
+	private LineItemTargeting getLineItemTargetingObj(OrderLineItem orderLineItem, Long elementId) {
+		LineItemTargeting lineItemTargeting = new LineItemTargeting();
+		lineItemTargeting.setSosUserId(sosUserId);
+		lineItemTargeting.setOrderLineItem(orderLineItem);
+		TargetElement tarElement = new TargetElement();
+		tarElement.setTargetElementId(elementId);
+		lineItemTargeting.setTargetElement(tarElement);
+		return lineItemTargeting;
+	}
+
+	private Map<Long,List<Long>> getRegionCountryMap (){
+		Map<Long,List<Long>> regionCountryMap = new HashMap<Long, List<Long>>();
+		for(CountryRegionMap countryRegionMap :targetingService.getAllCountryRegionData()){
+			if(regionCountryMap.containsKey(countryRegionMap.getId().getRegionId())){
+				regionCountryMap.get(countryRegionMap.getId().getRegionId()).add(countryRegionMap.getId().getCountryId());
+			}else{
+				List <Long> countryLst = new ArrayList<Long>();
+				countryLst.add(countryRegionMap.getId().getCountryId());
+				regionCountryMap.put(countryRegionMap.getId().getRegionId(),countryLst);
+			}
+		}
+		return regionCountryMap;
+	}
+
+	public void setSosIntegrationDao(ISosIntegrationDao sosIntegrationDao) {
+		this.sosIntegrationDao = sosIntegrationDao;
+	}
+
+	public void setProposalService(IProposalService proposalService) {
+		this.proposalService = proposalService;
+	}
+
+	public void setSalesTargetService(ISalesTargetService salesTargetService) {
+		this.salesTargetService = salesTargetService;
+	}
+
+	public void setTargetingService(ITargetingService targetingService) {
+		this.targetingService = targetingService;
+	}
+
+	public void setSosUserId(Long sosUserId) {
+		this.sosUserId = sosUserId;
+	}
+
+	public void setProposalDao(IProposalDAO proposalDao) {
+		this.proposalDao = proposalDao;
+	}
+
+	public void setProductService(IProductService productService) {
+		this.productService = productService;
+	}
+}

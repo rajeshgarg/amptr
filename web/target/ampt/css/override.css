@@ -1,0 +1,26 @@
+/* This CSS has styles which override the CSS of various plug-ins used */
+/*.ui-multiselect-checkboxes label{min-width:300px}*/
+#specType_custom .ui-multiselect-checkboxes label{min-width:0;}
+.ui-icon-triangle-1-n{background-position:1px -16px;}
+.assign .select2-container .select2-choice{top:-2px;background:#fff;}
+.select2-container .select2-choice{border:1px solid #C7D8F3;background:none;background-image:none;filter:none}
+.select2-container .select2-choice div{border-left:0;background:none;background-image:none;filter:none}
+.select2-container-active .select2-choice{border:1px solid #C7D8F3;}
+.select2-drop{border:1px solid #C7D8F3;}
+.select2-dropdown-open .select2-choice{background:none;background-image:none;filter:none}
+.ui-widget-content a{font-family:Trebuchet MS,Verdana,Arial,sans-serif;color:#003cff;font-weight:700;}
+.ui-widget-content a span.select-all-text{color:#000;}
+#moveReservationsDialogue{overflow:hidden !important}
+#moveReservationsDialogue .select2-results{overflow-x:auto}
+#moveReservationsDialogue .select2-results li{width:350px}
+.select2-container{background:#fff;}
+#assignTo_select2{background:none}
+.select2-result-label{text-overflow:ellipsis;white-space:nowrap;overflow:hidden;}
+.dashboard-filter .select2-container .select2-choice{padding:0 0 0 5px;}
+.dashboard-filter .select2-container .select2-choice span{margin-right:0;width:92%;max-width:180px;word-wrap:normal;}
+.dashboard-filter .ui-multiselect span:last-child{width:89%;max-width:180px;word-wrap:normal;}
+.dashboard-filter .ui-multiselect-menu{width:270px !important;}
+#manageProposalTable td, #sosResrvtnDataTable td{cursor:pointer;}
+.ui-jqgrid-bdiv{overflow-x:hidden !important;}
+.ui-timepicker-div dl dd{margin-right:15px}
+.ui-icon-transferthick-e-w{-webkit-transform:rotate(90deg);-moz-transform:rotate(90deg);-ms-transform:rotate(90deg);-o-transform:rotate(90deg);transform:rotate(90deg);}

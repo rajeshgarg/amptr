@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:util="http://www.springframework.org/schema/util"
+      xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+            http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<!-- ODS Data base connectivity settings -->
+	<bean id="odsBasicDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${driverClassName}" />
+		<property name="url" value="${db.ods.connectionURL}" />
+		<property name="username" value="${db.ods.username}" />
+		<property name="password" value="${ods.password}" />
+		<property name="defaultTransactionIsolation">
+            <util:constant static-field="java.sql.Connection.TRANSACTION_READ_COMMITTED" />
+		</property>
+	</bean>
+
+	<bean id="odsSessionFactory" class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+		<property name="dataSource"><ref local="odsBasicDataSource"/></property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.Oracle10gDialect</prop>
+				<prop key="hibernate.show_sql">false</prop>
+				<prop key="hibernate.format_sql">false</prop>
+				<prop key="hibernate.jdbc.use_get_generated_keys">true</prop>
+       			<prop key="hibernate.cache.use_query_cache">true</prop>
+            	<prop key="hibernate.cache.use_second_level_cache">true</prop>
+            	<prop key="hibernate.cache.provider_class">org.hibernate.cache.EhCacheProvider</prop>
+            	<prop key="hibernate.cache.region.factory_class">net.sf.ehcache.hibernate.EhCacheRegionFactory</prop>
+            	<prop key="hibernate.query.factory_class">org.hibernate.hql.classic.ClassicQueryTranslatorFactory</prop>
+            	<prop key="hibernate.default_schema">NYTDODS</prop>
+			</props>
+		</property>
+		<property name="annotatedClasses">
+			<list>
+				<value>com.nyt.mpt.domain.Product</value>
+				<value>com.nyt.mpt.domain.ProductPosition</value>
+				<value>com.nyt.mpt.domain.PrimaryPageGroup</value>
+				<value>com.nyt.mpt.domain.ProductPlacement</value>
+				<value>com.nyt.mpt.domain.ProductType</value>
+				<value>com.nyt.mpt.domain.SalesTargetType</value>
+				<value>com.nyt.mpt.domain.SOSSalesCategory</value>
+				<value>com.nyt.mpt.domain.ProductClass</value>
+				<value>com.nyt.mpt.domain.SalesTarget</value>
+				<value>com.nyt.mpt.domain.ProposalClients</value>
+				<value>com.nyt.mpt.domain.Agency</value>
+				<value>com.nyt.mpt.domain.Advertiser</value>				
+				<value>com.nyt.mpt.domain.AMPTDisplayLists</value>
+				<value>com.nyt.mpt.domain.Position</value>
+				<value>com.nyt.mpt.domain.ClusterSalesTarget</value>
+				<value>com.nyt.mpt.domain.Country</value>
+				<value>com.nyt.mpt.domain.Currency</value>
+				<value>com.nyt.mpt.domain.CurrencyConversion</value>
+				<value>com.nyt.mpt.domain.CurrencyConversionRate</value>
+				<value>com.nyt.mpt.domain.lineItemTransPeriod</value>
+				<value>com.nyt.mpt.domain.lineItemTransPeriodType</value>
+			</list>
+		</property>		
+		
+	</bean>
+	
+	<bean class="org.springframework.orm.hibernate3.HibernateTemplate" id="odsHibernateTemplate">
+		<property name="sessionFactory"><ref local="odsSessionFactory"/></property>
+	</bean>
+	
+	<!-- SOS Data base connectivity settings 	-->
+	<bean id="sosBasicDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${driverClassName}" />
+		<property name="url" value="${db.sos.connectionURL}" />
+		<property name="username" value="${db.sos.username}" />
+		<property name="password" value="${sos.password}" />
+		<property name="defaultTransactionIsolation">
+            <util:constant static-field="java.sql.Connection.TRANSACTION_READ_COMMITTED" />
+		</property>
+	</bean>
+
+	<bean id="sosSessionFactory" class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+		<property name="dataSource"><ref local="sosBasicDataSource"/></property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.Oracle10gDialect</prop>
+				<prop key="hibernate.show_sql">false</prop>
+				<prop key="hibernate.format_sql">false</prop>
+				<prop key="hibernate.jdbc.use_get_generated_keys">true</prop>
+       			<prop key="hibernate.cache.use_query_cache">true</prop>
+            	<prop key="hibernate.cache.use_second_level_cache">true</prop>
+            	<prop key="hibernate.cache.provider_class">org.hibernate.cache.EhCacheProvider</prop>
+            	<prop key="hibernate.cache.region.factory_class">net.sf.ehcache.hibernate.EhCacheRegionFactory</prop>
+            	<prop key="hibernate.query.factory_class">org.hibernate.hql.classic.ClassicQueryTranslatorFactory</prop>
+			</props>
+		</property>
+		<property name="annotatedClasses">
+			<list>
+				<value>com.nyt.mpt.domain.sos.Customer</value>
+				<value>com.nyt.mpt.domain.sos.SalesOrder</value>
+				<value>com.nyt.mpt.domain.sos.OrderLineItem</value>
+				<value>com.nyt.mpt.domain.sos.LineItemTargeting</value>
+				<value>com.nyt.mpt.domain.sos.TargetType</value>
+				<value>com.nyt.mpt.domain.sos.TargetElement</value>
+				<value>com.nyt.mpt.domain.sos.Region</value>
+				<value>com.nyt.mpt.domain.sos.Countries</value>
+				<value>com.nyt.mpt.domain.sos.OrderContactAssociation</value>
+				<value>com.nyt.mpt.domain.sos.Product</value>
+				<value>com.nyt.mpt.domain.sos.ProductType</value>
+				<value>com.nyt.mpt.domain.sos.ProductPlacement</value>
+				<value>com.nyt.mpt.domain.sos.ProductClass</value>
+				<value>com.nyt.mpt.domain.sos.SalesTargetType</value>				
+				<value>com.nyt.mpt.domain.sos.SalesTarget</value>
+				<value>com.nyt.mpt.domain.sos.SosNotes</value>
+				<value>com.nyt.mpt.domain.sos.SosUser</value>
+			</list>
+		</property>		
+	</bean>
+	
+	<bean class="org.springframework.orm.hibernate3.HibernateTemplate" id="sosHibernateTemplate">
+		<property name="sessionFactory"><ref local="sosSessionFactory"/></property>
+	</bean>
+</beans>

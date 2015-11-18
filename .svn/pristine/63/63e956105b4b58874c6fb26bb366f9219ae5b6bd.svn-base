@@ -1,0 +1,506 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util" 
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd 
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:serviceConfig.properties</value>
+				<value>file:${password.properties}</value>
+				<value>file:${env.properties}</value>
+			</list>
+		</property>
+	</bean>
+
+	<import resource="spring-quartz-config.xml"/>
+
+	<import resource="spring-hibernate-sos-config.xml" />
+	
+	<import resource="spring-hibernate-ampt-config.xml" />
+	
+	<aop:aspectj-autoproxy/>
+	
+	<bean id="amptTransactionManager" class="org.springframework.orm.hibernate3.HibernateTransactionManager">
+		<property name="dataSource" ref="amptBasicDataSource" />
+		<property name="sessionFactory" ref="amptSessionFactory"/>
+	</bean>
+	
+	<bean id="healthCheckInterceptorAMPT" class="com.nyt.mpt.util.intercepter.AMPTPerformanceMonitorInterceptor" />
+	
+	<tx:advice id="hibernateTxManagerAdvice" transaction-manager="amptTransactionManager">
+		<tx:attributes>
+			<tx:method name="save*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="add*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="create*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="convert*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="update*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="set*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="delete*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="get*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="find*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="download*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="fetch*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="load*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="generate*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="populate*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="execute*" read-only="true" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="sendMail*" read-only="false" propagation="REQUIRED" rollback-for="RuntimeException" />
+			<tx:method name="saveSf*" read-only="false" propagation="REQUIRED" rollback-for="Exception" />
+			<tx:method name="salesforce*" read-only="true" propagation="REQUIRES_NEW" />
+			<!-- <tx:method name="sendMailForHomeResrvtn" read-only="false" propagation="REQUIRES_NEW" /> -->
+		</tx:attributes>
+	</tx:advice>
+
+	<aop:config proxy-target-class="true">  						 	
+		<aop:pointcut id="hibernateServiceOperation" expression="execution(* com.nyt.mpt..*.*Service.*(..))" />
+		<aop:advisor pointcut-ref="hibernateServiceOperation" advice-ref="hibernateTxManagerAdvice" order="10"/>
+		<aop:advisor pointcut-ref="hibernateServiceOperation" advice-ref="healthCheckInterceptorAMPT"/> 
+	</aop:config>
+	<bean id="proposalAccessValidator" class="com.nyt.mpt.util.intercepter.ProposalAccessValidatorInterceptor">
+		<property name="proposalService"><ref local="proposalService" /></property>		
+	</bean> 
+	
+	<bean id="integrityValidator" class="com.nyt.mpt.util.intercepter.IntegrityValidatorInterceptor">
+		<property name="validatorService">
+			<bean class="com.nyt.mpt.service.impl.ValidatorService">
+				<property name="validatorDao">
+					<bean class="com.nyt.mpt.dao.impl.ValidatorDao">
+						<property name="hibernateTemplate" ref="amptHibernateTemplate"></property>
+					</bean>
+				</property>
+			</bean>
+		</property>
+		<property name="validators">
+			<util:map>
+				<entry key="com.nyt.mpt.domain.Attribute" value-ref="attributeValidator"></entry>
+				<entry key="com.nyt.mpt.domain.Creative" value-ref="creativeValidator"></entry>
+				<entry key="com.nyt.mpt.domain.User" value-ref="userValidator"></entry>
+			</util:map>
+		</property>
+	</bean>
+	
+	<bean id="validatorService" class="com.nyt.mpt.service.impl.ValidatorService">
+		<property name="validatorDao">
+			<bean class="com.nyt.mpt.dao.impl.ValidatorDao">
+				<property name="hibernateTemplate" ref="amptHibernateTemplate"></property>
+			</bean>
+		</property>
+	</bean>
+	
+	<bean id="userValidator" class="com.nyt.mpt.validator.Validator">
+		<property name="associationValidator">
+			<util:list>
+				<value>${proposal_assigneduser}</value>
+			</util:list>
+		</property>
+	</bean>
+	
+	<bean id="attributeValidator" class="com.nyt.mpt.validator.Validator">
+		<property name="associationValidator">
+			<util:list>
+				<value>${attribute_creative}</value>
+				<value>${attribute_product}</value>
+			</util:list>
+		</property>
+	</bean>
+	
+	<bean id="creativeValidator" class="com.nyt.mpt.validator.Validator">
+		<property name="associationValidator">
+			<util:list>
+				<value>${creative_product}</value>
+			</util:list>
+		</property>
+	</bean>
+	
+	<bean id="creativeDAO" class="com.nyt.mpt.dao.impl.CreativeDAO">		
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="creativeService" class="com.nyt.mpt.service.impl.CreativeService">		
+		<property name="creativeDAO"><ref local="creativeDAO" /></property>
+	</bean>
+	
+	<bean id="attributeDAO" class="com.nyt.mpt.dao.impl.AttributeDAO">		
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="attributeService" class="com.nyt.mpt.service.impl.AttributeService">		
+		<property name="attributeDAO"><ref local="attributeDAO" /></property>
+	</bean>	
+	
+	<bean id="rateProfileDAO" class="com.nyt.mpt.dao.impl.RateProfileDAO">		
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="rateProfileService" class="com.nyt.mpt.service.impl.RateProfileService">		
+		<property name="rateProfileDAO"><ref local="rateProfileDAO" /></property>
+	</bean>
+	
+	<bean id="userDao" class="com.nyt.mpt.dao.impl.UserDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="databaseHeartBeatSchedularDAO" class="com.nyt.mpt.dao.impl.DatabaseHeartBeatSchedularDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="databaseHeartBeatService" class="com.nyt.mpt.service.impl.DatabaseHeartBeatService">
+		<property name="databaseHeartBeatSchedularDAO"><ref local="databaseHeartBeatSchedularDAO" /></property>	
+	</bean>
+	
+	<bean id="oDSDatabaseHeartBeatSchedularDAO" class="com.nyt.mpt.dao.impl.ODSDatabaseHeartBeatSchedularDAO">
+		<property name="hibernateTemplate" ref="odsHibernateTemplate" />
+	</bean>
+	
+	<bean id="userService" class="com.nyt.mpt.service.impl.UserService">
+		<property name="userDao"><ref local="userDao" /></property>
+		<property name="roleDAO"><ref local="roleDAO" /></property>
+		<property name="ldapSearchProvider"><ref bean="${ldap.searchProvider}"/></property>
+	</bean>
+	
+	<bean id="productDao" class="com.nyt.mpt.dao.impl.ProductDAO">
+		<property name="productDaoAMPT"><ref local="productDaoAMPT" /></property>
+		<property name="hibernateTemplate" ref="odsHibernateTemplate" />
+	</bean>
+	
+	<bean id="productDaoAMPT" class="com.nyt.mpt.dao.impl.ProductDAOAMPT">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="productService" class="com.nyt.mpt.service.impl.ProductService">
+		<property name="productDao"><ref local="productDao" /></property>
+		<property name="productDaoAMPT"><ref local="productDaoAMPT" /></property>
+		<property name="productDaoSOS"><ref local="productDaoSOS" /></property>
+	</bean>
+	
+	<bean id="roleDAO" class="com.nyt.mpt.dao.impl.RoleDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+
+	<bean id="documentService" class="com.nyt.mpt.service.impl.DocumentService">
+		<property name="docUtil"><ref local="docUtil"/></property>
+		<property name="documentDAO"><ref local="documentDao" /></property>
+	</bean>
+	
+	<bean id="documentDao" class="com.nyt.mpt.dao.impl.DocumentDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="docUtil" class="com.nyt.mpt.util.DocumentUtil">
+		<property name="baseLocation" value="${document.location}"></property>
+	</bean>
+	
+	<bean id="proposalService" class="com.nyt.mpt.service.impl.ProposalService">
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="proposalUtilService"><ref local="proposalUtilService" /></property>
+		<property name="auditService"><ref local="auditService" /></property>
+		<property name="sosService"><ref local="sosService" /></property>
+		<property name="proposalSOSService"><ref local="proposalSOSService" /></property>
+		<property name="pricingCalculator"><ref local="pricingCalculator" /></property>
+		<property name="pricingStatusCalculatorService"><ref local="pricingStatusCalculatorService" /></property>
+		<property name="salesForceProposalService"><ref local="salesForceProposalService" /></property>
+		<property name="userService"><ref local="userService" /></property>
+		<property name="sosURL" value="${sos.url}"></property>	
+	</bean>
+	
+	<bean id="proposalUtilService" class="com.nyt.mpt.service.impl.ProposalUtilService">
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="applicationURL" value="${application.url}"></property>
+		<property name="mailUtil"><ref local="mailUtil" /></property>
+		<property name="userService"><ref local="userService" /></property>
+		<property name="auditService"><ref local="auditService" /></property>
+		<property name="proposalService"><ref local="proposalService" /></property>
+		<property name="reservationService"><ref local="reservationService" /></property>
+		<property name="sosService"><ref local="sosService" /></property>
+	</bean>
+	
+	<bean id="proposalSOSService" class="com.nyt.mpt.service.impl.ProposalSOSService">
+		<property name="proposalDaoSOS"><ref local="proposalDaoSOS" /></property>
+		<property name="productDao"><ref local="productDao" /></property>
+		<property name="salesTargetDAO"><ref local="salesTargetDAO" /></property>
+		<property name="productDaoSOS"><ref local="productDaoSOS" /></property>	
+	</bean>
+	
+	<bean id="proposalDao" class="com.nyt.mpt.dao.impl.ProposalDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+		<property name="reservationDao" ref="reservationDao"/>
+		<property name="salesTargetDAO"><ref local="salesTargetDAO" /></property>
+	</bean>
+	
+	<bean id="proposalDaoSOS" class="com.nyt.mpt.dao.impl.ProposalDAOSOS">
+		<property name="hibernateTemplate" ref="odsHibernateTemplate" />
+	</bean>
+	
+	<bean id="templateService" class="com.nyt.mpt.service.impl.TemplateService">
+		<property name="templateDao"><ref local="templateDao" /></property>
+		<property name="productService"><ref local="productService" /></property>
+		<property name="creativeService"><ref local="creativeService" /></property>
+		<property name="proposalService"><ref local="proposalService" /></property>
+		<property name="sosService"><ref local="sosService" /></property>
+		<property name="proposalSOSService"><ref local="proposalSOSService" /></property>
+		<property name="targetingService"><ref local="targetingService" /></property>
+	</bean>
+	
+	<bean id="templateDao" class="com.nyt.mpt.dao.impl.TemplateDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="packageService" class="com.nyt.mpt.service.impl.PackageService">
+		<property name="packageDAO"><ref local="packageDao" /></property>
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="pricingCalculator"><ref local="pricingCalculator" /></property>		
+	</bean>
+	
+	<bean id="packageDao" class="com.nyt.mpt.dao.impl.PackageDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="salesTargetDAO" class="com.nyt.mpt.dao.impl.SalesTargetDAO">
+		<property name="hibernateTemplate" ref="odsHibernateTemplate" />
+	</bean>
+	
+	<bean id="salesTargetService" class="com.nyt.mpt.service.impl.SalesTargetService">
+		<property name="salesTargetDAO"><ref local="salesTargetDAO" /></property>
+		<property name="salesTargetAmptDAO"><ref local="salesTargetAmptDAO" /></property>
+		<property name="salesTargetDAOSOS"><ref local="salesTargetDAOSOS" /></property>	
+	</bean>
+	
+	<bean id="sosDao" class="com.nyt.mpt.dao.impl.SOSDao">
+		<property name="hibernateTemplate" ref="odsHibernateTemplate" />
+	</bean>
+	
+	<bean id="sosService" class="com.nyt.mpt.service.impl.SOSService">
+		<property name="sosDao"><ref local="sosDao" /></property>		
+	</bean>
+	
+	<!-- The Spring LDAP Template executes core LDAP functionalities. It requires the Context Source for its operations.-->
+	<bean id="ldapTemplate" class="org.springframework.ldap.core.LdapTemplate">
+		<property name="contextSource">
+			<bean class="org.springframework.ldap.core.support.LdapContextSource">
+				<property name="url" value="${ldap.serverURL}" />
+				<property name="base" value="${ldap.ldapBase}" />
+				<property name="userDn" value="${ldap.userDn}" />
+				<property name="password" value="${ldap.ldapUserPassword}"/>
+			</bean>
+		</property>
+	</bean>
+	
+	<bean id="nytLdapSearchProvider" class="com.nyt.mpt.util.ldap.LdapSearchProvider" lazy-init="true">
+		<property name="ldapTemplate"><ref local="ldapTemplate"/></property>
+	</bean>
+	
+	<bean id="tavantLdapSearchProvider" class="com.nyt.mpt.util.ldap.TavantLdapSearchProvider" lazy-init="true">
+		<property name="ldapTemplate"><ref local="ldapTemplate"/></property>
+	</bean>
+
+    <bean id="yieldexService" class="com.nyt.mpt.service.impl.YieldexService">
+        <property name="restTemplate"><ref local="restTemplate"/></property>
+	</bean>
+    
+    <bean id="restTemplate" class="org.springframework.web.client.RestTemplate">
+        <property name="messageConverters">
+            <list>
+              <bean class="org.springframework.http.converter.xml.SourceHttpMessageConverter"/>
+            </list>
+        </property>
+    </bean>
+	  
+	<bean id="mailUtil" class="com.nyt.mpt.util.MailUtil">
+		<property name="notification" value="${email.notification}"></property>
+		<constructor-arg name="mailSender">
+			<bean class="org.springframework.mail.javamail.JavaMailSenderImpl">
+				<property name="host" value="${email.server}"></property>
+			</bean>
+		</constructor-arg>
+		<property name="envMailProperties">
+			<props>
+				<prop key="env">${env}</prop>
+			</props>
+		</property>
+	</bean>
+
+	<bean id="salesTargetAmptDAO" class="com.nyt.mpt.dao.impl.SalesTargetAmptDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+
+	<bean id="yieldexHelper" class="com.nyt.mpt.util.YieldexHelper">
+		<property name="productService"><ref local="productService" /></property>
+		<property name="targetingService"><ref local="targetingService" /></property>
+		<property name="salesTargetService"><ref local="salesTargetService" /></property>
+		<property name="yieldexUserName" value="${yieldex.username}"></property>
+		<property name="yieldexPassword" value="${yieldex.password}"></property>
+		<property name="yieldexBaseUrl" value="${yieldex.baseurl}"></property>
+	</bean>	
+	
+	<bean id="cronDao" class="com.nyt.mpt.dao.impl.CronJobDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="cronService" class="com.nyt.mpt.service.impl.CronJobService">
+		<property name="cronDAO"><ref local="cronDao" /></property>		
+	</bean>
+	
+	<bean id="targetingDao" class="com.nyt.mpt.dao.impl.TargetingDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean> 
+	
+	<bean id="targetingService" class="com.nyt.mpt.service.impl.TargetingService">
+		<property name="targetingDao" ref="targetingDao"/>
+	</bean> 
+	
+	<bean id="auditDAO" class="com.nyt.mpt.dao.impl.AuditDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean> 
+	
+	<bean id="auditService" class="com.nyt.mpt.service.impl.AuditService">
+		<property name="auditDAO" ref="auditDAO"/>
+		<property name="userService"><ref local="userService" /></property>
+		<property name="salesForceProposalService"><ref local="salesForceProposalService" /></property>
+	</bean>
+	
+	<bean id="tierDAO" class="com.nyt.mpt.dao.impl.TierDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="tierService" class="com.nyt.mpt.service.impl.TierService">
+		<property name="tierDAO" ref="tierDAO"/>
+	</bean>
+
+	<bean id="pricingCalculator" class="com.nyt.mpt.service.impl.PricingCalculator">
+		<property name="rateProfileService"><ref local="rateProfileService" /></property>
+		<property name="tierService"><ref local="tierService" /></property>
+		<property name="salesTargetService"><ref local="salesTargetService" /></property>
+		<property name="targetingService"><ref local="targetingService" /></property>
+		<property name="sosService"><ref local="sosService" /></property>
+	</bean>
+		
+	<bean id="reservationDao" class="com.nyt.mpt.dao.impl.CalendarReservationDao">
+		<property name="hibernateTemplate" ref="sosHibernateTemplate" />
+		<property name="salesTargetDAO"><ref local="salesTargetDAO" /></property>
+	</bean>
+	
+	<bean id="reservationService" class="com.nyt.mpt.service.impl.CalendarReservationService">
+		<property name="targetingDao" ref="targetingDao"/>
+		<property name="reservationDao" ref="reservationDao"/>
+		<property name="emailScheduleService" ref="emailScheduleService"/>
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="productService" ref="productService"/>
+		<property name="sosService" ref="sosService"/>
+	</bean>
+	
+	<bean id="sosDatabaseHeartBeatSchedularDAO" class="com.nyt.mpt.dao.impl.SOSDatabaseHeartBeatSchedularDAO">
+		<property name="hibernateTemplate" ref="sosHibernateTemplate" />
+	</bean>
+	
+	<bean id="dashboardDao" class="com.nyt.mpt.dao.impl.DashboardDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="dashboardService" class="com.nyt.mpt.service.impl.DashboardService">
+		<property name="dashboardDao"><ref local="dashboardDao" /></property>
+	</bean>
+	
+	<bean id="sosIntegrationDao" class="com.nyt.mpt.dao.impl.SosIntegrationDao">
+		<property name="hibernateTemplate" ref="sosHibernateTemplate" />
+	</bean>
+	
+	<bean id="sosIntegrationService" class="com.nyt.mpt.service.impl.SosIntegrationService">
+		<property name="sosIntegrationDao" ref="sosIntegrationDao"/>
+		<property name="proposalService"><ref local="proposalService" /></property>
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="salesTargetService"><ref local="salesTargetService" /></property>		
+		<property name="targetingService"><ref local="targetingService" /></property>
+		<property name="sosUserId" value="${sos.user.id}"></property>
+		<property name="productService"><ref local="productService" /></property>
+	</bean>
+	
+	<bean id="addedValueService" class="com.nyt.mpt.service.impl.AddedValueService">
+		<property name="addedValueDao" ref="addedValueDao"/>
+	</bean>
+	
+	<bean id="addedValueDao" class="com.nyt.mpt.dao.impl.AddedValueDao">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="salesTargetDAOSOS" class="com.nyt.mpt.dao.impl.SalesTargetDAOSOS">
+		<property name="hibernateTemplate" ref="sosHibernateTemplate" />
+	</bean>
+	
+	<bean id="productDaoSOS" class="com.nyt.mpt.dao.impl.ProductDAOSOS">
+		<property name="hibernateTemplate" ref="sosHibernateTemplate" />
+	</bean>
+	
+	<bean id="salesForceProposalService" class="com.nyt.mpt.service.impl.SalesForceProposalService">
+		<property name="sfProposalDAO"><ref local="salesForceProposalDAO" /></property>
+		<property name="cronJobService"><ref local="cronService" /></property>
+		<property name="sfProposalHelper"><ref local="salesForceProposalServiceHelper" /></property>
+		<property name="auditService"><ref local="auditService" /></property>
+		<property name="applicationURL" value="${application.url}"></property>
+		<property name="documentService"><ref local="documentService" /></property>
+		<property name="proposalSOSService"><ref local="proposalSOSService" /></property>
+	</bean>
+	
+	<bean id="salesForceProposalServiceHelper" class="com.nyt.mpt.util.SalesforceProposalServiceHelper">
+		<property name="mailUtil"><ref local="mailUtil" /></property>
+		<property name="sosService"><ref local="sosService" /></property>
+		<property name="proposalSOSService"><ref local="proposalSOSService" /></property>
+		<property name="salesForceProposalService"><ref local="salesForceProposalService" /></property>
+		<property name="proposalService"><ref local="proposalService" /></property>
+		<property name="salesforceIntegrationEmailFrom" value="${salesforce.integration.job.email.from}"></property>
+		<property name="salesforceConnectionFailureEmailTo" value="${salesforce.connection.failure.email.to}"></property>
+		<property name="userService"><ref local="userService" /></property>		
+	</bean>
+	
+	<bean id="salesForceProposalDAO" class="com.nyt.mpt.dao.impl.SalesForceProposalDAO">
+		<property name="connection" ref="enterPriseConnection"></property>
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+		
+	<bean id="enterPriseConnection" class="com.sforce.soap.enterprise.EnterpriseConnection" scope="prototype">
+		<constructor-arg name="config" ref="connectorConfig"></constructor-arg>
+	</bean>
+	
+	<bean id="connectorConfig" class="com.sforce.ws.ConnectorConfig" scope="prototype">
+		<property name="username" value="${salesforce.username}"></property>
+		<property name="password" value="${salesforce.password}"></property>
+		<property name="authEndpoint" value="${salesforce.url}"></property>
+	</bean>
+	<bean id="pricingStatusCalculatorService" class="com.nyt.mpt.service.impl.PricingStatusCalculatorService">
+		<property name="proposalDao"><ref local="proposalDao" /></property>
+		<property name="proposalService"><ref local="proposalService" /></property>
+		<property name="addedValueService"><ref local="addedValueService" /></property>
+		<property name="TOLERANCE_PERCENT" value="${added.value.tolerance.percent}"></property>
+		<property name="THRESHOLD_PERCENT" value="${option.threshold.limit.percent}"></property>
+	</bean>
+		
+	<bean id="multipleCalendarDao" class="com.nyt.mpt.dao.impl.MultipleCalendarDao">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="multipleCalendarService" class="com.nyt.mpt.service.impl.MultipleCalendarService">
+		<property name="multipleCalendarDao" ref="multipleCalendarDao"/>
+	</bean>
+
+	<bean id="emailScheduleService" class="com.nyt.mpt.service.impl.EmailScheduleService">
+		<property name="emailScheduleDAO" ref="emailScheduleDao" />
+	</bean>
+
+	<bean id="emailScheduleDao" class="com.nyt.mpt.dao.impl.EmailScheduleDAO">
+		<property name="hibernateTemplate" ref="amptHibernateTemplate" />
+	</bean>
+	
+	<bean id="applicationVersion" class="org.springframework.beans.factory.config.PropertiesFactoryBean">
+		<property name="properties">
+			<props>
+				<prop key="appVersion">${buildNumber}</prop>
+			</props>
+		</property>
+	</bean>
+	
+</beans>

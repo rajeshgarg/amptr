@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<!-- parent info -->
+	<parent>
+		<groupId>com.nyt.mpt</groupId>
+		<artifactId>mpt</artifactId>
+		<version>3</version>
+		<relativePath>../pom.xml</relativePath>
+	</parent>
+
+	<!-- basic project info -->
+	<artifactId>adx-ampt</artifactId>
+	<packaging>war</packaging>
+	<name>NYT MPT - Web (Spring MVC)</name>
+
+	<build>
+		<finalName>ampt</finalName>
+		<plugins>
+			<!-- Tomcat Plugin -->
+			<plugin>
+				<!-- For running Tomcat execute: mvn tomcat:run -->
+				<!--
+						For running Tomcat in debug mode Add JVM debug options in
+						MAVEN_OPTS environment variable
+					-->
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>tomcat-maven-plugin</artifactId>
+				<version>1.1</version>
+				<configuration>
+					<port>8080</port>
+				</configuration>
+			</plugin>
+			<!-- Tomcat Plugin Ends -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-war-plugin</artifactId>
+				<version>2.0.2</version>
+			</plugin>
+			<plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <version>2.1-alpha-2</version>
+				<configuration>
+                    <copyright>2012 - nytimes</copyright>
+                    <group>Application/Collectors</group>
+					<version>${releaseVersion}</version>
+					<release>${buildNumber}</release>
+					<mappings>
+                        <mapping>
+							<directoryIncluded>false</directoryIncluded>
+                            <directory>/opt/tomcat/webapps</directory>
+                            <username>tomcat</username>
+                            <groupname>tomcat</groupname>
+                            <sources>
+                                <source>
+                                    <location>target/ampt.war</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                    </mappings>
+					<preinstallScriptlet>
+						<script>
+							#!/bin/sh
+							export JAVA_HOME=/usr/java/latest;
+							export PATH=$JAVA_HOME/bin:$PATH;
+							export CATALINA_HOME=/opt/tomcat;
+							export CATALINA_BASE=/opt/tomcat;
+							#shutdown tomcat
+							su -p -s /bin/sh tomcat $CATALINA_HOME/bin/shutdown.sh;
+							sleep 30;
+							#kill tomcat process if it is still running for some reason
+							if [ `ps auxwwww|grep tomcat|grep -v grep|wc -l` -gt 0 ]
+							then
+							for pid in `ps auxwww|grep tomcat|grep -v grep|tr -s ' '|cut -d ' ' -f2`
+							do
+							echo "killing tomcat process with id as $pid"
+							kill -9 $pid
+							done
+							fi
+							#remove existing application
+							rm /opt/tomcat/webapps/ampt.war;
+							rm -rf /opt/tomcat/work/Catalina/localhost/ampt;
+							rm -rf /opt/tomcat/webapps/ampt;
+						</script>
+					</preinstallScriptlet>
+					<postinstallScriptlet>
+						<script>
+							#!/bin/sh
+							export CATALINA_HOME=/opt/tomcat;
+							su -p -s /bin/sh tomcat $CATALINA_HOME/bin/catalina.sh start;
+						</script>
+					</postinstallScriptlet>
+                </configuration>
+            </plugin>
+		</plugins>
+
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+
+		<testResources>
+			<testResource>
+				<directory>src/test/resources</directory>
+				<filtering>true</filtering>
+			</testResource>
+			<testResource>
+				<directory>src/main/webapp</directory>
+				<filtering>true</filtering>
+				<includes>
+					<include>**/*.xml</include>
+				</includes>
+			</testResource>
+		</testResources>
+	</build>
+
+	<distributionManagement>
+		<repository>
+		   <id>${nexus.release.id}</id>
+		  <name>${nexus.release.id}</name>
+		  <url>${nexus.release.url}</url>
+		</repository>
+		<snapshotRepository>
+		  <id>${nexus.snapshot.id}</id>
+		  <name>${nexus.snapshot.id}</name>
+		  <url>${nexus.snapshot.url}</url>
+		</snapshotRepository>
+	</distributionManagement>
+	
+	<dependencies>
+		<dependency>
+			<groupId>${project.parent.groupId}</groupId>
+			<artifactId>core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>jsp-api</artifactId>
+			<version>2.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>jstl</artifactId>
+			<version>1.1.2</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>taglibs</groupId>
+			<artifactId>standard</artifactId>
+			<version>1.1.2</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-lang</groupId>
+			<artifactId>commons-lang</artifactId>
+			<version>2.6</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-fileupload</groupId>
+			<artifactId>commons-fileupload</artifactId>
+			<version>1.2.2</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-io</groupId>
+			<artifactId>commons-io</artifactId>
+			<version>2.0</version>
+		</dependency>
+		<!-- Spring modules -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-web</artifactId>
+			<version>${org.springframework.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-webmvc</artifactId>
+			<version>${org.springframework.version}</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.webflow</groupId>
+			<artifactId>spring-binding</artifactId>
+			<version>2.3.0.RELEASE</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.webflow</groupId>
+			<artifactId>spring-js</artifactId>
+			<version>2.3.0.RELEASE</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.webflow</groupId>
+			<artifactId>spring-webflow</artifactId>
+			<version>2.3.0.RELEASE</version>
+		</dependency>
+				
+		<!-- Spring modules ends -->
+		<dependency>
+			<groupId>org.easymock</groupId>
+			<artifactId>easymockclassextension</artifactId>
+			<version>2.3</version>
+			<scope>test</scope>
+		</dependency>		
+		<dependency>
+			<groupId>javax.validation</groupId>
+			<artifactId>validation-api</artifactId>
+			<version>1.0.0.GA</version>
+		</dependency>		
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-validator</artifactId>
+			<version>4.0.0.GA</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.mail</groupId>
+			<artifactId>mail</artifactId>
+			<version>1.4</version>
+		</dependency>
+		<dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>3.7</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>3.7</version>
+        </dependency>
+		<dependency>
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpmime</artifactId>
+			<version>4.1.2</version>
+		</dependency>		
+		<dependency>		
+			<groupId>org.apache.httpcomponents</groupId>
+			<artifactId>httpclient</artifactId>
+			<version>4.1.2</version>
+		</dependency>		
+	</dependencies>
+</project>

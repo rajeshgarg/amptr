@@ -1,0 +1,305 @@
+/**
+ * 
+ */
+package com.nyt.mpt.util.cron;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+
+import com.nyt.mpt.domain.Advertiser;
+import com.nyt.mpt.domain.Audit;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.Proposal;
+import com.nyt.mpt.service.IAuditService;
+import com.nyt.mpt.service.ICalendarReservationService;
+import com.nyt.mpt.service.ISOSService;
+import com.nyt.mpt.service.impl.ProposalSOSService;
+import com.nyt.mpt.service.impl.ProposalService;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.DateUtil;
+import com.nyt.mpt.util.MailUtil;
+import com.nyt.mpt.util.enums.CronJobNameEnum;
+import com.nyt.mpt.util.enums.ProposalStatus;
+import com.nyt.mpt.util.exception.CustomCheckedException;
+import com.nyt.mpt.util.reservation.ReservationTO;
+
+/**
+ * This <code>VulnerableLineItemProposalJob</code> class includes methods for sending alert mails for proposal owner of vulnerable line item.
+ * @author nayab.ali
+ *
+ */
+public class VulnerableProposalHomePageReservationJob extends AbstractCronJob{
+	
+	private static final Logger LOGGER = Logger.getLogger(VulnerableProposalHomePageReservationJob.class);
+	private ProposalService proposalService;
+	private ICalendarReservationService reservationService;
+	private String applicationURL;
+	private ISOSService sosService;
+	private ProposalSOSService proposalSOSService;
+	private String homePageRreservationEmailFrom;
+	private MailUtil mailUtil;
+	private IAuditService auditService;
+	String lineItemids;
+	
+	
+	@Override
+	protected void executeInternal(JobExecutionContext context)
+			throws JobExecutionException {
+		LOGGER.debug("VulnerableLineItemProposalJob started.......................");
+		if (!isJobActiveOnServer(CronJobNameEnum.VULNERABLE_PROPOSAL_HOME_PAGE_RESERVATION_JOB)) {
+			return;
+		}
+		super.setUserForCronJobs();
+		
+		
+		List<LineItem> lineItemLst = proposalService.getVulnerableHomepageReservations();
+		final Map<Long, List<LineItem>> proposalLineItemMap = new HashMap<Long, List<LineItem>>();
+		final Map<Long, Set<String>>  userIdsMap = new  HashMap<Long,  Set<String>>();
+		for (LineItem lineItem : lineItemLst) {
+			
+			//code for getting all owner mail corresponding line item. 		
+			final Proposal proposal = lineItem.getProposalVersion().getProposalOption().getProposal();
+			 
+			ReservationTO reservationVO = new ReservationTO();
+			reservationVO.setEndDate(lineItem.getEndDate());
+			reservationVO.setStartDate(lineItem.getStartDate());
+			reservationVO.setProductId(lineItem.getSosProductId());
+			reservationVO.setSalesTargetId(lineItem.getLineItemSalesTargetAssocs().get(0).getSosSalesTargetId());
+			reservationVO.setLineItemTargeting(lineItem.getGeoTargetSet());
+			List<Proposal> proposalLst = reservationService.getProposedProposalsForCalendar(reservationVO);
+			Set<String> toUserSet = new HashSet<String>();
+	 		for (Proposal proposalObj : proposalLst) {
+				if(proposalObj.getAssignedUser() != null && proposalObj.getAssignedUser().isActive() && !(ProposalStatus.DELETED.name().equals(proposalObj.getProposalStatus().name()) || ProposalStatus.EXPIRED.name().equals(proposalObj.getProposalStatus().name()))
+					&& proposalObj.getId() != proposal.getId()){
+					toUserSet.add(proposalObj.getAssignedUser().getEmail());
+				}
+			}
+	 		
+	 		if (userIdsMap.containsKey(proposal.getId())) {
+				userIdsMap.get(proposal.getId()).addAll(toUserSet);
+			} else {
+				userIdsMap.put(proposal.getId(), toUserSet);
+			}
+	 		
+	 		//code for getting map<proposalId,List<LineItem>>		
+			if (proposalLineItemMap.containsKey(proposal.getId())) {
+				proposalLineItemMap.get(proposal.getId()).add(lineItem);
+			} else {
+				final List<LineItem> lineItemList = new ArrayList<LineItem>();
+				lineItemList.add(lineItem);
+				proposalLineItemMap.put(proposal.getId(), lineItemList);
+			}
+		}
+		for(Entry entry:proposalLineItemMap.entrySet())
+		{
+			StringBuffer textMsg=new StringBuffer();
+			StringBuffer mailCc =  new StringBuffer();
+			StringBuffer lineItemID=new StringBuffer();
+			Set<String> userSet=(Set<String>)userIdsMap.get(entry.getKey());
+			LineItem lineItemObj =((List<LineItem>)entry.getValue()).get(0);
+			Proposal  proposal = lineItemObj.getProposalVersion().getProposalOption().getProposal();
+			String mailTo = proposal.getAssignedUser().getEmail();
+			String advertiserName;
+			Long sosAdvertiserId=proposal.getSosAdvertiserId();
+			if(sosAdvertiserId!=null)
+			{	
+				advertiserName = getAdvertiser().get(sosAdvertiserId)==null ? ConstantStrings.EMPTY_STRING : getAdvertiser().get(sosAdvertiserId);
+			}else{
+				String sosAdvertiserName = proposal.getSosAdvertiserName();
+				advertiserName = sosAdvertiserName==null ? ConstantStrings.EMPTY_STRING : sosAdvertiserName;
+			}
+			   
+			for (String userId : userSet) 
+			{
+				if(mailCc.length() > 0){
+					mailCc.append(ConstantStrings.COMMA);
+				}
+				mailCc.append(userId);
+			}
+			   
+			for(LineItem lineItem : (List<LineItem>)entry.getValue())
+			{
+				if (textMsg != null && textMsg.length() > 0) {
+					textMsg.append("\n\n\n");
+				}
+				textMsg.append(createTextMsg(lineItem, advertiserName));
+				
+				if(lineItemID.length()>0){
+					lineItemID.append(ConstantStrings.COMMA);
+				}
+				 lineItemids=lineItemID.append(lineItem.getLineItemID()).toString();
+			}
+			if (StringUtils.isNotBlank(applicationURL)) {
+				textMsg.append("\t\n\t\n").append(applicationURL).append(ConstantStrings.PROPOSAL_URL).append(proposal.getId());
+			}
+			advertiserName = ConstantStrings.EMPTY_STRING.equals(advertiserName) ? "your advertiser" :   advertiserName;
+			sendMail(mailTo,"Please release the date if it is not needed by "+advertiserName,mailCc == null? "": mailCc.toString(),textMsg);
+			  //sendMail("nayab.ali@tavant.com","Please release date if it is no longer needed by "+ advertiserName,"",textMsg);
+			try {
+				final Audit audit = auditService.createAuditForVulnerableProposalHomePageReservation(proposal,lineItemids);
+			} catch (CustomCheckedException e) {
+				 
+				e.printStackTrace();
+			}  
+		}
+	}
+	
+	
+	/**
+	 * Sends Email for given parameter
+	 * @param mailTo
+	 * @param subject
+	 * @param carbnCopy
+	 * @param textMsg
+	 */
+	private void sendMail(final String mailTo, final String subject, final String carbnCopy, final StringBuffer textMsg) {
+		final Map<String, String> mailProps = new HashMap<String, String>();
+		mailProps.put("mailTo", mailTo);
+		mailProps.put("subject", subject);
+		mailProps.put("mailFrom", homePageRreservationEmailFrom);
+		 mailProps.put("textMsg", textMsg.toString());
+		if(StringUtils.isNotBlank(carbnCopy)){
+			mailProps.put("cc", carbnCopy.trim());
+		}
+	  	try{	
+	     	mailUtil.sendMail(mailUtil.setMessageInfo(mailProps));
+	 	}catch(Exception e){
+	 		LOGGER.error(e.getMessage());
+		}
+	}
+
+	
+	
+	
+	/**
+	 * Create body for the Email
+	 * @param lineItem
+	 * @return
+	 */
+	private String createTextMsg(final LineItem lineItem, String advertiserName) {
+		final StringBuffer textMsg = new StringBuffer(150);
+	 try{	
+		
+	 	final Proposal proposal = lineItem.getProposalVersion().getProposalOption().getProposal();
+	  	 
+		textMsg.append("\t\n Proposal Name: ").append(proposal.getName());
+		textMsg.append("\t\n Advertiser Name: ").append(advertiserName);
+		textMsg.append("\t\n Sales Category Name: ").append( sosService.getSalesCategories().get(proposal.getSosSalesCategoryId()) );
+		textMsg.append("\t\n LineItemID: ").append(lineItem.getLineItemID());
+		textMsg.append("\t\n Ad Unit: ").append(lineItem.getProductName());
+		if(lineItem.getLineItemSalesTargetAssocs()!=null){	
+			textMsg.append("\t\n Sales Target : ").append(lineItem.getLineItemSalesTargetAssocs().get(0).getSosSalesTargetName());
+		}
+		textMsg.append("\t\n Target: ").append(StringUtils.isBlank(lineItem.getTargetingString()) ? ConstantStrings.EMPTY_STRING : lineItem.getTargetingString());
+		if (lineItem.getStartDate() != null && lineItem.getEndDate() != null) {
+			textMsg.append("\t\n Flight: ").append(DateUtil.getGuiDateString(lineItem.getStartDate())).append(" - ").append(DateUtil.getGuiDateString(lineItem.getEndDate()));
+		}
+
+		final String accountManager = proposal.getAccountManager();
+		textMsg.append("\t\n Account Manager: ").append(StringUtils.isBlank(accountManager) ? ConstantStrings.EMPTY_STRING : accountManager);
+	 }catch(Exception e){
+		 LOGGER.error(e.getMessage());
+	 }
+		return textMsg.toString();
+
+	}
+	
+	/**
+     * this is used for getting the advertiser name.
+     * @return
+     */
+	
+	private Map<Long, String> getAdvertiser() {
+		final Map<Long, String> advertiserMap = new LinkedHashMap<Long, String>();
+		for (Advertiser advertiser : proposalSOSService.getAdvertiser()) {
+			advertiserMap.put(advertiser.getId(), advertiser.getName());
+		}
+		return advertiserMap;
+	}
+
+	 	/**
+	 * @param proposalService the proposalService to set
+	 */
+	public void setProposalService(ProposalService proposalService) {
+		this.proposalService = proposalService;
+	}
+
+
+ 
+		/**
+		 * @param reservationService the reservationService to set
+		 */
+		public void setReservationService(ICalendarReservationService reservationService) {
+			this.reservationService = reservationService;
+		}
+
+ 	/**
+		 * @param sosService the sosService to set
+		 */
+		public void setSosService(ISOSService sosService) {
+			this.sosService = sosService;
+		}
+
+ 
+	/**
+	 * @param applicationURL the applicationURL to set
+	 */
+	public void setApplicationURL(String applicationURL) {
+		this.applicationURL = applicationURL;
+	}
+	 /**
+		 * @param proposalSOSService the proposalSOSService to set
+		 */
+		public void setProposalSOSService(ProposalSOSService proposalSOSService) {
+			this.proposalSOSService = proposalSOSService;
+		}
+
+	 
+
+	/**
+	 * @param mailUtil the mailUtil to set
+	 */
+	public void setMailUtil(MailUtil mailUtil) {
+		this.mailUtil = mailUtil;
+	}
+
+	/**
+	 * @return the homePageRreservationEmailFrom
+	 */
+	public String getHomePageRreservationEmailFrom() {
+		return homePageRreservationEmailFrom;
+	}
+
+	/**
+	 * @param homePageRreservationEmailFrom the homePageRreservationEmailFrom to set
+	 */
+	public void setHomePageRreservationEmailFrom(
+			String homePageRreservationEmailFrom) {
+		this.homePageRreservationEmailFrom = homePageRreservationEmailFrom;
+	}
+
+ 
+	/**
+	 * @param auditService the auditService to set
+	 */
+	public void setAuditService(IAuditService auditService) {
+		this.auditService = auditService;
+	}
+
+
+
+
+
+		
+}

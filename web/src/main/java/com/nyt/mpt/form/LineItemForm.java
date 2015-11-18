@@ -1,0 +1,976 @@
+/**
+ *
+ */
+package com.nyt.mpt.form;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+
+import org.apache.commons.lang.StringUtils;
+
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.LineItemReservations;
+import com.nyt.mpt.domain.LineItemSalesTargetAssoc;
+import com.nyt.mpt.domain.SalesTarget;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.Constants;
+import com.nyt.mpt.util.DateUtil;
+import com.nyt.mpt.util.NumberUtil;
+import com.nyt.mpt.util.TargetJsonConverter;
+import com.nyt.mpt.util.enums.LineItemPriceTypeEnum;
+import com.nyt.mpt.util.enums.LineItemProductTypeEnum;
+import com.nyt.mpt.util.enums.LineItemViewableCriteriaEnum;
+import com.nyt.mpt.util.enums.PricingStatus;
+import com.nyt.mpt.util.enums.ReservationStatus;
+import com.nyt.mpt.util.reservation.ReservationTO;
+
+/**
+ * This line item form bean is used for proposal line item information
+ * 
+ * @author amandeep.singh
+ */
+public class LineItemForm extends BaseForm<LineItem> {
+
+	private static final String ZERO = "0";
+
+	private long lineItemID;
+
+	private Long sosLineItemID;
+
+	private String proposalLineItemAssocId;
+
+	private String primaryId;
+
+	private String sosProductId;
+
+	private String sosProductClassId;
+
+	private String sosSalesTargetName;
+
+	private String[] sosSalesTargetId;
+
+	private String startDate;
+
+	private String endDate;
+
+	private String totalRevenue;
+
+	private String comments;
+
+	private boolean active = true;
+
+	private boolean partiallyCopiedUnbreakPackage = false;
+
+	private String flight;
+
+	private String rate;
+
+	private String priceType;
+
+	private String impressionTotal;
+
+	private String totalPossibleImpressions;
+
+	private String totalInvestment;
+
+	private String packageId;
+
+	private String type;
+
+	private String budget;
+
+	private String proposalID;
+
+	private String proposalversion;
+
+	private String displayFlight;
+
+	private String productName;
+
+	private String partiallyCopiedDisplay;
+
+	private String salesTargetGroupName;
+
+	private String rateCardPrice;
+
+	private String placementName;
+
+	private String avails;
+
+	private String sov;
+
+	private String lineItemExceptions;
+
+	private String orderNumber;
+
+	private String product_active = Constants.YES;
+
+	private String salesTarget_active = Constants.YES;
+
+	private String productSalesTargetCombo_active = Constants.YES;
+
+	private String availsPopulatedDate;
+
+	private String discount;
+
+	private String lineItemSequence;
+
+	private String[] specType;
+
+	private String optionId;
+
+	private String sosTarTypeId;
+
+	private String lineItemTargetingData;
+
+	private long proposalVersionID;
+
+	private String currentAvails;
+
+	private String currentTotalPossibleImpressions;
+
+	private String targetingString;
+
+	private String priceCalSummary;
+
+	private String sor;
+
+	private String reservationExpiryDate;
+
+	private String reservationCreationDate;
+
+	private boolean reserved;
+
+	private String productType;
+
+	private String optionName;
+
+	private boolean offeredImpLessThanCurAvails = false;
+
+	private boolean rateX = false;
+
+	private String pricingStatus;
+
+	private String packageName;
+
+	private String manageAvailsOption;
+	
+	private String gridLineItemIds;
+	
+	private String currentAvailsUICamparision;
+	
+	private String currentTotalUICamparision;
+	
+	private boolean sorExceededHidden = false;
+	
+	private String lastRenewedOn;
+	
+	private Long availSystemId;
+	
+	private int isViewable;
+	
+	private String viewableDisplayName;
+	
+
+	private String sosProductClassName;
+	
+	public String getAvailsPopulatedDate() {
+		return availsPopulatedDate;
+	}
+
+	public void setAvailsPopulatedDate(final String availsPopulatedDate) {
+		this.availsPopulatedDate = availsPopulatedDate;
+	}
+
+	public long getLineItemID() {
+		return lineItemID;
+	}
+
+	public void setLineItemID(final long lineItemID) {
+		this.lineItemID = lineItemID;
+	}
+
+	public Long getSosLineItemID() {
+		return sosLineItemID;
+	}
+
+	public void setSosLineItemID(final Long sosLineItemID) {
+		this.sosLineItemID = sosLineItemID;
+	}
+
+	public String getPrimaryId() {
+		return primaryId;
+	}
+
+	public void setPrimaryId(final String id) {
+		this.primaryId = id == null ? id : id.trim();
+	}
+
+	public String getSosProductId() {
+		return sosProductId;
+	}
+
+	public void setSosProductId(final String sosProductId) {
+		this.sosProductId = sosProductId == null ? sosProductId : sosProductId.trim();
+	}
+
+	public String getStartDate() {
+		return startDate;
+	}
+
+	public void setStartDate(final String startDate) {
+		this.startDate = startDate == null ? startDate : startDate.trim();
+	}
+
+	public String getEndDate() {
+		return endDate;
+	}
+
+	public void setEndDate(final String endDate) {
+		this.endDate = endDate == null ? endDate : endDate.trim();
+	}
+
+	public String getTotalRevenue() {
+		return totalRevenue;
+	}
+
+	public void setTotalRevenue(final String totalRevenue) {
+		this.totalRevenue = totalRevenue == null ? totalRevenue : totalRevenue.trim();
+	}
+
+	public String getComments() {
+		return comments;
+	}
+
+	public void setComments(final String comments) {
+		this.comments = comments == null ? comments : comments.trim();
+	}
+
+	public boolean isActive() {
+		return active;
+	}
+
+	public void setActive(final boolean active) {
+		this.active = active;
+	}
+
+	public boolean isPartiallyCopiedUnbreakPackage() {
+		return partiallyCopiedUnbreakPackage;
+	}
+
+	public void setPartiallyCopiedUnbreakPackage(final boolean copied) {
+		this.partiallyCopiedUnbreakPackage = copied;
+	}
+
+	public String getFlight() {
+		return flight;
+	}
+
+	public void setFlight(final String flight) {
+		this.flight = flight == null ? flight : flight.trim();
+	}
+
+	public String getRate() {
+		return rate;
+	}
+
+	public void setRate(final String rate) {
+		this.rate = (rate == null || rate.equalsIgnoreCase("NA")) ? null : rate.trim();
+	}
+
+	public String getPriceType() {
+		return priceType;
+	}
+
+	public void setPriceType(final String priceType) {
+		this.priceType = priceType == null ? priceType : priceType.trim();
+	}
+
+	public String getImpressionTotal() {
+		return impressionTotal;
+	}
+
+	public void setImpressionTotal(final String impressionTotal) {
+		this.impressionTotal = impressionTotal == null ? impressionTotal : impressionTotal.trim();
+	}
+
+	public String getTotalPossibleImpressions() {
+		return totalPossibleImpressions;
+	}
+
+	public void setTotalPossibleImpressions(final String impressions) {
+		this.totalPossibleImpressions = impressions == null ? impressions : impressions.trim();
+	}
+
+	public String getTotalInvestment() {
+		return totalInvestment;
+	}
+
+	public void setTotalInvestment(final String totalInvestment) {
+		this.totalInvestment = totalInvestment == null ? totalInvestment : totalInvestment.trim();
+	}
+
+	public String getPackageId() {
+		return packageId;
+	}
+
+	public void setPackageId(final String packageId) {
+		this.packageId = packageId == null ? packageId : packageId.trim();
+	}
+
+	public String getType() {
+		return type;
+	}
+
+	public void setType(final String type) {
+		this.type = type == null ? type : type.trim();
+	}
+
+	public String getBudget() {
+		return budget;
+	}
+
+	public void setBudget(final String budget) {
+		this.budget = budget == null ? budget : budget.trim();
+	}
+
+	public String getProposalID() {
+		return proposalID;
+	}
+
+	public void setProposalID(final String proposalID) {
+		this.proposalID = proposalID == null ? proposalID : proposalID.trim();
+	}
+
+	public String getProposalversion() {
+		return proposalversion;
+	}
+
+	public void setProposalversion(final String proposalVersion) {
+		this.proposalversion = proposalVersion == null ? proposalVersion : proposalVersion.trim();
+	}
+
+	public String getDisplayFlight() {
+		return displayFlight;
+	}
+
+	public void setDisplayFlight(final String displayFlight) {
+		this.displayFlight = displayFlight == null ? displayFlight : displayFlight.trim();
+	}
+
+	public String getProductName() {
+		return productName;
+	}
+
+	public void setProductName(final String productName) {
+		this.productName = productName == null ? productName : productName.trim();
+	}
+
+	public String getSosProductClassId() {
+		return sosProductClassId;
+	}
+
+	public void setSosProductClassId(final String sosProductClassId) {
+		this.sosProductClassId = sosProductClassId == null ? sosProductClassId : sosProductClassId.trim();
+	}
+
+	public String getSosSalesTargetName() {
+		return sosSalesTargetName;
+	}
+
+	public void setSosSalesTargetName(final String sosSalesTargetName) {
+		this.sosSalesTargetName = sosSalesTargetName == null ? sosSalesTargetName : sosSalesTargetName.trim();
+	}
+
+	public int getVersion() {
+		return super.getVersion();
+	}
+
+	public void setVersion(final int version) {
+		super.setVersion(version);
+	}
+
+	public String getProposalLineItemAssocId() {
+		return proposalLineItemAssocId;
+	}
+
+	public void setProposalLineItemAssocId(final String assocId) {
+		this.proposalLineItemAssocId = assocId == null ? assocId : assocId.trim();
+	}
+
+	public String getPartiallyCopiedDisplay() {
+		return partiallyCopiedDisplay;
+	}
+
+	public void setPartiallyCopiedDisplay(final String copiedDisplay) {
+		this.partiallyCopiedDisplay = copiedDisplay == null ? copiedDisplay : copiedDisplay.trim();
+	}
+
+	public String getSalesTargetGroupName() {
+		return salesTargetGroupName;
+	}
+
+	public void setSalesTargetGroupName(final String groupName) {
+		this.salesTargetGroupName = groupName == null ? groupName : groupName.trim();
+	}
+
+	public String getRateCardPrice() {
+		return rateCardPrice;
+	}
+
+	public void setRateCardPrice(final String rateCardPrice) {
+		this.rateCardPrice = rateCardPrice == null ? rateCardPrice : rateCardPrice.trim();
+	}
+
+	public String getPlacementName() {
+		return placementName;
+	}
+
+	public void setPlacementName(final String placementName) {
+		this.placementName = placementName == null ? placementName : placementName.trim();
+	}
+
+	public String getAvails() {
+		return avails;
+	}
+
+	public void setAvails(final String avails) {
+		this.avails = avails == null ? avails : avails.trim();
+	}
+
+	public String getSov() {
+		return sov;
+	}
+
+	public void setSov(final String sov) {
+		this.sov = sov == null ? sov : sov.trim();
+	}
+
+	public String getLineItemExceptions() {
+		return lineItemExceptions;
+	}
+
+	public void setLineItemExceptions(final String lineItemExceptions) {
+		this.lineItemExceptions = lineItemExceptions == null ? lineItemExceptions : lineItemExceptions.trim();
+	}
+
+	@Override
+	public LineItem populate(final LineItem bean) {
+		bean.setLineItemID(this.getLineItemID());
+		bean.setComments(this.getComments());
+		if (StringUtils.isNotBlank(this.getEndDate())) {
+			bean.setEndDate(DateUtil.parseToDate(this.getEndDate()));
+		}
+		bean.setVersion(getVersion());
+		bean.setFlight(this.getFlight());
+		if (StringUtils.isNotBlank(this.getImpressionTotal())) {
+			bean.setImpressionTotal(NumberUtil.longValue(this.getImpressionTotal()));
+		}
+		if (StringUtils.isNotBlank(this.getTotalPossibleImpressions())) {
+			bean.setTotalPossibleImpressions(NumberUtil.longValue(this.getTotalPossibleImpressions()));
+		}
+		bean.setPriceType(this.getPriceType());
+		if (StringUtils.isNotBlank(this.getRate())) {
+			bean.setRate(NumberUtil.doubleValue(this.getRate()));
+		}
+		bean.setSosProductId(StringUtils.isNotBlank(this.getSosProductId()) ? NumberUtil.longValue(this.getSosProductId()) : 0);
+		bean.setProductName(this.getProductName());
+		bean.setTargetingString(this.getTargetingString());
+		if (StringUtils.isNotBlank(this.getStartDate())) {
+			bean.setStartDate(DateUtil.parseToDate(this.getStartDate()));
+		}
+		if (StringUtils.isNotBlank(this.getTotalInvestment())) {
+			bean.setTotalInvestment(NumberUtil.doubleValue(this.getTotalInvestment()));
+		}
+		bean.setSosProductClass(StringUtils.isNotBlank(this.getSosProductClassId()) ? NumberUtil.longValue(this.getSosProductClassId()) : 0);
+		bean.setProposalId(StringUtils.isNotBlank(this.getProposalID()) ? NumberUtil.longValue(this.getProposalID()) : null);
+		bean.setPartiallyCopiedUnbreakPackage(this.isPartiallyCopiedUnbreakPackage());
+
+		bean.setRateCardPrice((StringUtils.isNotBlank(this.getRateCardPrice()) && !StringUtils.equals(this.getRateCardPrice(), ConstantStrings.NOT_DEFINED)
+				&& !StringUtils.equals(this.getRateCardPrice(), ConstantStrings.NA)) ? NumberUtil.doubleValue(this.getRateCardPrice()) : 0);
+		if (StringUtils.isNotBlank(this.getAvails())) {
+			bean.setAvails(NumberUtil.doubleValue(this.getAvails()));
+		}
+		if (StringUtils.isNotBlank(this.getSov())) {
+			bean.setSov(NumberUtil.doubleValue(this.getSov()));
+		}
+		bean.setPlacementName(this.getPlacementName());
+		if (StringUtils.isNotBlank(this.getOrderNumber()) || this.getLineItemID() == 0) {
+			bean.setOrderNumber(System.currentTimeMillis());
+		}
+		if (StringUtils.isNotBlank(this.getAvailsPopulatedDate())) {
+			bean.setAvailsPopulatedDate(DateUtil.parseToDate(this.getAvailsPopulatedDate()));
+		}
+		bean.setLineItemSequence(NumberUtil.intValue(this.getLineItemSequence()));
+		bean.setViewabilityLevel(this.getIsViewable());
+		if (this.getSpecType() != null && this.getSpecType().length > 0) {
+			final String[] specTypeArray = this.getSpecType();
+			String specTypeStr = ConstantStrings.EMPTY_STRING;
+			for (String specTypeVal : specTypeArray) {
+				if (specTypeStr != ConstantStrings.EMPTY_STRING) {
+					specTypeStr += ConstantStrings.COMMA;
+				}
+				specTypeStr += specTypeVal;
+			}
+			bean.setSpecType(specTypeStr);
+		}
+		if (StringUtils.isNotBlank(this.getLineItemTargetingData())) {
+			bean.setGeoTargetSet(TargetJsonConverter.convertJsonToObject(this.getLineItemTargetingData(), bean));
+		}
+		if (StringUtils.isNotBlank(this.getPriceCalSummary())) {
+			bean.setPriceCalSummary(getPriceCalSummary());
+		}
+
+		if (LineItemProductTypeEnum.RESERVABLE.getShortName().equals(this.productType) || LineItemProductTypeEnum.EMAIL.getShortName().equals(this.productType)) {
+			if (StringUtils.isNotBlank(this.getSor())) {
+				bean.setSor(NumberUtil.doubleValue(this.getSor()));
+			}
+			if (this.getReservationExpiryDate() != null && !ConstantStrings.EMPTY_STRING.equals(this.getReservationExpiryDate())) {
+				final LineItemReservations reservation = new LineItemReservations();
+				reservation.setProposalLineItem(bean);
+				reservation.setStatus(ReservationStatus.HOLD);
+				reservation.setExpirationDate(DateUtil.parseToDate(this.getReservationExpiryDate()));
+				bean.setReservation(reservation);
+			}
+			if(LineItemProductTypeEnum.EMAIL.getShortName().equals(this.productType)){
+				bean.setSor(100D);
+			}
+		}
+		bean.setProductType(LineItemProductTypeEnum.findByShortName(this.productType));
+		bean.setRatex(this.isRateX());
+		
+		if (StringUtils.isNotBlank(this.getPricingStatus())) {
+			bean.setPricingStatus(PricingStatus.findByDisplayName(this.getPricingStatus()));
+		}
+		return bean;
+	}
+
+	/**
+	 * Populates sales target and their names
+	 * 
+	 * @param bean
+	 * @param salestargetLst
+	 * @return
+	 */
+	public LineItem populateSalestargetAssoc(final LineItem bean, final List<SalesTarget> salestargetLst) {
+		if (salestargetLst != null && !salestargetLst.isEmpty()) {
+			final List<LineItemSalesTargetAssoc> assocsList = new ArrayList<LineItemSalesTargetAssoc>();
+			LineItemSalesTargetAssoc targetAssoc = null;
+			for (SalesTarget salesTarget : salestargetLst) {
+				targetAssoc = new LineItemSalesTargetAssoc();
+				targetAssoc.setSosSalesTargetId(salesTarget.getSalesTargetId());
+				targetAssoc.setSosSalesTargetName(salesTarget.getSalesTargeDisplayName());
+				targetAssoc.setProposalLineItem(bean);
+				assocsList.add(targetAssoc);
+			}
+			bean.setLineItemSalesTargetAssocs(assocsList);
+		}
+		return bean;
+	}
+
+	@Override
+	public void populateForm(final LineItem bean) {
+		this.setLineItemID(bean.getLineItemID());
+		this.setVersion(bean.getVersion());
+		this.setComments(bean.getComments());
+		this.setEndDate((bean.getEndDate() == null) ? ConstantStrings.EMPTY_STRING : DateUtil.getGuiDateString(bean.getEndDate()));
+		this.setFlight(bean.getFlight());
+		this.setDisplayFlight(bean.getFlight());
+		this.setPartiallyCopiedUnbreakPackage(bean.isPartiallyCopiedUnbreakPackage());
+		this.setImpressionTotal((bean.getImpressionTotal() == null) ? ConstantStrings.EMPTY_STRING : NumberUtil.formatLong(bean.getImpressionTotal().longValue(), true));
+		this.setTotalPossibleImpressions((bean.getTotalPossibleImpressions() == null) ?
+				ConstantStrings.EMPTY_STRING : NumberUtil.formatLong(bean.getTotalPossibleImpressions(), true));
+		this.setPriceType(bean.getPriceType());
+		this.setRate((bean.getRate() == null) ? ConstantStrings.NA : NumberUtil.formatDouble(bean.getRate(), true));
+		if (bean.getLineItemSalesTargetAssocs() != null && bean.getLineItemSalesTargetAssocs().size() > 0) {
+			final List<LineItemSalesTargetAssoc> assocsList = bean.getLineItemSalesTargetAssocs();
+			final HashSet<String> salesTargetIds = new HashSet<String>(assocsList.size());
+			String salesTargetNames = ConstantStrings.EMPTY_STRING;
+			for (LineItemSalesTargetAssoc lineItemSalesTargetAssoc : assocsList) {
+				if (lineItemSalesTargetAssoc.getSosSalesTargetId() != null) {
+					salesTargetIds.add(Long.toString(lineItemSalesTargetAssoc.getSosSalesTargetId()));
+					if (lineItemSalesTargetAssoc.getSosSalesTargetName() != null) {
+						salesTargetNames = salesTargetNames + lineItemSalesTargetAssoc.getSosSalesTargetName() + ",";
+					}
+				}
+			}
+			if (StringUtils.isNotBlank(salesTargetNames)) {
+				salesTargetNames = salesTargetNames.trim().substring(0, salesTargetNames.length() - 1);
+			}
+			this.setSosSalesTargetName(salesTargetNames);
+			this.setSosSalesTargetId(salesTargetIds.toArray(new String[0]));
+		}
+		this.setSosProductId((bean.getSosProductId() == null) ? ZERO : String.valueOf(bean.getSosProductId()));
+		this.setProductName(bean.getProductName());
+		this.setTargetingString(bean.getTargetingString());
+		this.setSosProductClassId((bean.getSosProductClass() == null) ? ZERO : String.valueOf(bean.getSosProductClass()));
+		this.setStartDate((bean.getEndDate() == null) ? bean.getFlight() : DateUtil.getGuiDateString(bean.getStartDate()));
+		this.setTotalInvestment((bean.getTotalInvestment() == null) ? ConstantStrings.EMPTY_STRING : NumberUtil.formatDouble(bean.getTotalInvestment(), true));
+		if (LineItemPriceTypeEnum.FLATRATE.getOptionValue().equals(bean.getPriceType())) {
+			this.setRateCardPrice((bean.getRateCardPrice() != null && bean.getRateCardPrice() > 0) ? NumberUtil.formatDouble(bean.getRateCardPrice(), true) : ConstantStrings.NA);
+		} else {
+			this.setRateCardPrice((bean.getRateCardPrice() != null && bean.getRateCardPrice() > 0) ? NumberUtil.formatDouble(bean.getRateCardPrice(), true) : ConstantStrings.NOT_DEFINED);
+		}
+		if (bean.isPartiallyCopiedUnbreakPackage()) {
+			this.setPartiallyCopiedDisplay("Yes");
+		} else {
+			this.setPartiallyCopiedDisplay("No");
+		}
+		this.setAvails((bean.getAvails() == null) ? ConstantStrings.EMPTY_STRING : NumberUtil.formatLong(bean.getAvails().longValue(), true));
+		this.setSov((bean.getSov() == null) ? ConstantStrings.EMPTY_STRING : NumberUtil.formatDouble(bean.getSov(), true));
+		this.setPlacementName(bean.getPlacementName());
+		this.setAvailsPopulatedDate((bean.getAvailsPopulatedDate() == null)
+				? ConstantStrings.EMPTY_STRING : DateUtil.getGuiDateString(bean.getAvailsPopulatedDate()));
+		this.setLineItemSequence(NumberUtil.formatLong(bean.getLineItemSequence(), true));
+		if (StringUtils.isNotBlank(bean.getSpecType())) {
+			this.setSpecType(bean.getSpecType().split(ConstantStrings.COMMA));
+		}
+		if (bean.getProposalVersion() != null) {
+			this.setProposalVersionID(bean.getProposalVersion().getId());
+		}
+		if (LineItemProductTypeEnum.RESERVABLE.name().equals(bean.getProductType().name()) || LineItemProductTypeEnum.EMAIL.name().equals(bean.getProductType().name())) {
+			this.setSor((bean.getSor() == null) ? ConstantStrings.EMPTY_STRING : NumberUtil.formatDouble(bean.getSor(), true));
+			if (bean.getReservation() != null) {
+				final LineItemReservations reservation = bean.getReservation();
+				this.setReservationExpiryDate((reservation.getExpirationDate() == null) ? ConstantStrings.EMPTY_STRING : DateUtil.getGuiDateString(reservation.getExpirationDate()));
+				this.setReservationCreationDate((reservation.getCreatedDate() == null) ? ConstantStrings.EMPTY_STRING : DateUtil.getGuiDateString(reservation.getCreatedDate()));
+				this.setLastRenewedOn((reservation.getLastRenewedOn() == null) ? ConstantStrings.EMPTY_STRING : DateUtil.getGuiDateString(reservation.getLastRenewedOn()));
+				if (!ReservationStatus.RELEASED.getDisplayName().equals(reservation.getStatus().getDisplayName())) {
+					this.setReserved(true);
+				} else {
+					this.setReserved(false);
+				}
+			}
+		} 
+		this.setProductType(bean.getProductType().getShortName());
+		this.setRateX(bean.isRatex());
+		if (bean.getPricingStatus() != null) {
+			this.setPricingStatus(bean.getPricingStatus().getDisplayName());
+		}
+		this.setSosLineItemID(bean.getSosLineItemID());
+		this.setIsViewable(bean.getViewabilityLevel());
+		this.setViewableDisplayName(LineItemViewableCriteriaEnum.getDisplayNameByValue(bean.getViewabilityLevel()).getDisplayName());
+	}
+
+	public ReservationTO populateToReservationVo(final ReservationTO bean) {
+		bean.setProposalId(Long.valueOf(this.proposalID));
+		bean.setLineItemId(this.lineItemID);
+		bean.setProductId(Long.valueOf(this.sosProductId));
+		bean.setSalesTargetId(Long.valueOf(this.sosSalesTargetId[0]));
+		bean.setCalculateSOR(true);
+		bean.setProductType(this.getProductType());
+		if (StringUtils.isNotBlank(this.lineItemTargetingData)) {
+			bean.setLineItemTargeting(TargetJsonConverter.convertJsonToObject(this.lineItemTargetingData.replaceAll("'", "\""), null));
+		}
+		return bean;
+	}
+	
+	public String getProduct_active() {
+		return product_active;
+	}
+
+	public void setProduct_active(final String productActive) {
+		this.product_active = productActive == null ? productActive : productActive.trim();
+	}
+
+	public String getSalesTarget_active() {
+		return salesTarget_active;
+	}
+
+	public void setSalesTarget_active(final String salesTargetActive) {
+		this.salesTarget_active = salesTargetActive == null ? salesTargetActive : salesTargetActive.trim();
+	}
+
+	public String getProductSalesTargetCombo_active() {
+		return productSalesTargetCombo_active;
+	}
+
+	public void setProductSalesTargetCombo_active(final String productSalesTargetComboActive) {
+		productSalesTargetCombo_active = productSalesTargetComboActive;
+	}
+
+	/**
+	 * @param orderNumber the orderNumber to set
+	 */
+	public void setOrderNumber(final String orderNumber) {
+		this.orderNumber = orderNumber;
+	}
+
+	/**
+	 * @return the orderNumber
+	 */
+	public String getOrderNumber() {
+		return orderNumber;
+	}
+
+	public String[] getSosSalesTargetId() {
+		return sosSalesTargetId;
+	}
+
+	public void setSosSalesTargetId(final String[] sosSalesTargetId) {
+		this.sosSalesTargetId = sosSalesTargetId;
+	}
+
+	/**
+	 * @return the discount
+	 */
+	public String getDiscount() {
+		return discount;
+	}
+
+	/**
+	 * @param discount the discount to set
+	 */
+	public void setDiscount(final String discount) {
+		this.discount = discount;
+	}
+
+	public String getLineItemSequence() {
+		return lineItemSequence;
+	}
+
+	public void setLineItemSequence(final String lineItemSequence) {
+		this.lineItemSequence = lineItemSequence;
+	}
+
+	public String[] getSpecType() {
+		return specType;
+	}
+
+	public void setSpecType(final String[] specType) {
+		this.specType = specType;
+	}
+
+	public String getOptionId() {
+		return optionId;
+	}
+
+	public void setOptionId(final String optionId) {
+		this.optionId = optionId;
+	}
+
+	public String getSosTarTypeId() {
+		return sosTarTypeId;
+	}
+
+	public void setSosTarTypeId(final String sosTarTypeId) {
+		this.sosTarTypeId = sosTarTypeId != null ? sosTarTypeId.trim() : sosTarTypeId;
+	}
+
+	public String getLineItemTargetingData() {
+		return lineItemTargetingData;
+	}
+
+	public void setLineItemTargetingData(final String lineItemTargetingData) {
+		this.lineItemTargetingData = lineItemTargetingData;
+	}
+
+	public void setProposalVersionID(final long proposalVersionID) {
+		this.proposalVersionID = proposalVersionID;
+	}
+
+	public long getProposalVersionID() {
+		return proposalVersionID;
+	}
+
+	public void setCurrentAvails(final String currentAvails) {
+		this.currentAvails = currentAvails;
+	}
+
+	public String getCurrentAvails() {
+		return currentAvails;
+	}
+
+	public void setCurrentTotalPossibleImpressions(final String currentTotalPossibleImpressions) {
+		this.currentTotalPossibleImpressions = currentTotalPossibleImpressions;
+	}
+
+	public String getCurrentTotalPossibleImpressions() {
+		return currentTotalPossibleImpressions;
+	}
+
+	/**
+	 * @return the targetingString
+	 */
+	public String getTargetingString() {
+		return targetingString;
+	}
+
+	/**
+	 * @param targetingString the targetingString to set
+	 */
+	public void setTargetingString(final String targetingString) {
+		this.targetingString = targetingString;
+	}
+
+	public void setPriceCalSummary(final String priceCalSummary) {
+		this.priceCalSummary = priceCalSummary;
+	}
+
+	public String getPriceCalSummary() {
+		return priceCalSummary;
+	}
+
+	public String getSor() {
+		return sor;
+	}
+
+	public void setSor(final String sor) {
+		this.sor = sor == null ? sor : sor.trim();
+	}
+
+	public String getReservationExpiryDate() {
+		return reservationExpiryDate;
+	}
+
+	public void setReservationExpiryDate(final String reservationExpiryDate) {
+		this.reservationExpiryDate = reservationExpiryDate;
+	}
+
+	public boolean isReserved() {
+		return reserved;
+	}
+
+	public void setReserved(final boolean reserved) {
+		this.reserved = reserved;
+	}
+
+	public String getProductType() {
+		return productType;
+	}
+
+	public void setProductType(final String productType) {
+		this.productType = productType;
+	}
+
+	public void setOptionName(final String optionName) {
+		this.optionName = optionName;
+	}
+
+	public String getOptionName() {
+		return optionName;
+	}
+
+	public void setReservationCreationDate(final String reservationCreationDate) {
+		this.reservationCreationDate = reservationCreationDate;
+	}
+
+	public String getReservationCreationDate() {
+		return reservationCreationDate;
+	}
+
+	public boolean isOfferedImpLessThanCurAvails() {
+		return offeredImpLessThanCurAvails;
+	}
+
+	public void setOfferedImpLessThanCurAvails(final boolean offeredImpLessThanCurAvails) {
+		this.offeredImpLessThanCurAvails = offeredImpLessThanCurAvails;
+	}
+
+	public void setRateX(final boolean rateX) {
+		this.rateX = rateX;
+	}
+
+	public boolean isRateX() {
+		return rateX;
+	}
+
+	public String getPricingStatus() {
+		return pricingStatus;
+	}
+
+	public void setPricingStatus(final String pricingStatus) {
+		this.pricingStatus = pricingStatus;
+	}
+
+	public String getPackageName() {
+		return packageName;
+	}
+
+	public void setPackageName(final String packageName) {
+		this.packageName = packageName;
+	}
+
+	public String getManageAvailsOption() {
+		return manageAvailsOption;
+	}
+
+	public void setManageAvailsOption(final String manageAvailsOption) {
+		this.manageAvailsOption = manageAvailsOption;
+	}
+
+	public String getGridLineItemIds() {
+		return gridLineItemIds;
+	}
+
+	public void setGridLineItemIds(final String gridLineItemIds) {
+		this.gridLineItemIds = gridLineItemIds;
+	}
+
+	public String getCurrentAvailsUICamparision() {
+		return currentAvailsUICamparision;
+	}
+
+	public void setCurrentAvailsUICamparision(String currentAvailsUICamparision) {
+		this.currentAvailsUICamparision = currentAvailsUICamparision;
+	}
+
+	public String getCurrentTotalUICamparision() {
+		return currentTotalUICamparision;
+	}
+
+	public void setCurrentTotalUICamparision(String currentTotalUICamparision) {
+		this.currentTotalUICamparision = currentTotalUICamparision;
+	}
+
+	public boolean getSorExceededHidden() {
+		return sorExceededHidden;
+	}
+
+	public void setSorExceededHidden(boolean sorExceededHidden) {
+		this.sorExceededHidden = sorExceededHidden;
+	}
+
+	public String getLastRenewedOn() {
+		return lastRenewedOn;
+	}
+
+	public void setLastRenewedOn(String lastRenewedOn) {
+		this.lastRenewedOn = lastRenewedOn;
+	}
+
+	public Long getAvailSystemId() {
+		return availSystemId;
+	}
+
+	public void setAvailSystemId(Long availSystemId) {
+		this.availSystemId = availSystemId;
+	}
+
+	public String getSosProductClassName() {
+		return sosProductClassName;
+	}
+
+	public void setSosProductClassName(String sosProductClassName) {
+		this.sosProductClassName = sosProductClassName;
+	}
+
+	public int getIsViewable() {
+		return isViewable;
+	}
+
+	public void setIsViewable(int isViewable) {
+		this.isViewable = isViewable;
+	}
+
+	public String getViewableDisplayName() {
+		return viewableDisplayName;
+	}
+
+	public void setViewableDisplayName(String viewableDisplayName) {
+		this.viewableDisplayName = viewableDisplayName;
+	}
+	
+	
+}

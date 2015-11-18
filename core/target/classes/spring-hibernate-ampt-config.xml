@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+	<bean id="amptBasicDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${driverClassName}" />
+		<property name="url" value="${db.ampt.connectionURL}" />
+		<property name="username" value="${db.ampt.username}" />
+		<property name="password" value="${ampt.password}" />
+	</bean>
+
+	<bean class="org.springframework.orm.hibernate3.HibernateTemplate" id="amptHibernateTemplate">
+		<property name="sessionFactory"><ref local="amptSessionFactory"/></property>
+	</bean>
+	
+	<bean id="nytDAOInterceptor" class="com.nyt.mpt.util.intercepter.NYTDAOInterceptor"/>
+	
+	<bean id="amptSessionFactory" class="org.springframework.orm.hibernate3.annotation.AnnotationSessionFactoryBean">
+		<property name="dataSource"><ref local="amptBasicDataSource"/></property>
+		<property name="entityInterceptor"><ref local="nytDAOInterceptor"/></property>
+		<property name="hibernateProperties">
+			<props>
+				<prop key="hibernate.dialect">org.hibernate.dialect.Oracle10gDialect</prop>
+				<prop key="hibernate.show_sql">false</prop>
+				<prop key="hibernate.format_sql">false</prop>
+				<prop key="hibernate.jdbc.use_get_generated_keys">true</prop>
+       			<prop key="hibernate.cache.use_query_cache">false</prop>
+            	<prop key="hibernate.cache.use_second_level_cache">false</prop>
+            	<prop key="hibernate.query.factory_class">org.hibernate.hql.classic.ClassicQueryTranslatorFactory</prop>
+            	<prop key="hibernate.default_schema">AMPT_OWNER</prop>
+			</props>
+		</property>
+		<property name="annotatedClasses">
+			<list>
+				<value>com.nyt.mpt.domain.User</value>
+				<value>com.nyt.mpt.domain.Role</value>
+				<value>com.nyt.mpt.domain.SalesCategory</value>
+				<value>com.nyt.mpt.domain.Creative</value>
+				<value>com.nyt.mpt.domain.CreativeAttributeValue</value>
+				<value>com.nyt.mpt.domain.Attribute</value>
+				<value>com.nyt.mpt.domain.Document</value>				
+				<value>com.nyt.mpt.domain.ProductAttributeAssoc</value>
+				<value>com.nyt.mpt.domain.ProductCreativeAssoc</value>
+				<value>com.nyt.mpt.domain.Package</value>
+				<value>com.nyt.mpt.domain.Proposal</value>
+				<value>com.nyt.mpt.domain.ProposalOption</value>
+				<value>com.nyt.mpt.domain.TemplateMetaData</value>
+				<value>com.nyt.mpt.domain.TemplateSheetMetaData</value>
+				<value>com.nyt.mpt.domain.TemplateMetaDataAttributes</value>
+				<value>com.nyt.mpt.domain.TemplateLineItemAttributesAssoc</value>
+				<value>com.nyt.mpt.domain.CampaignObjective</value>
+				<value>com.nyt.mpt.domain.ProposalVersion</value>
+				<value>com.nyt.mpt.domain.LineItem</value>
+				<value>com.nyt.mpt.domain.LineItemTarget</value>				
+				<value>com.nyt.mpt.domain.Authority</value>
+				<value>com.nyt.mpt.domain.LineItemExceptions</value>
+				<value>com.nyt.mpt.domain.LineItemSalesTargetAssoc</value>
+				<value>com.nyt.mpt.domain.SalesTargetAmpt</value>
+				<value>com.nyt.mpt.domain.CronJobSchedule</value>
+				<value>com.nyt.mpt.domain.CronJobConfiguration</value>
+				<value>com.nyt.mpt.domain.AudienceTargetType</value>
+				<value>com.nyt.mpt.domain.AudienceTarget</value>
+				<value>com.nyt.mpt.domain.CountryRegionMap</value>
+				<value>com.nyt.mpt.domain.Audit</value>
+				<value>com.nyt.mpt.domain.RateProfile</value>
+				<value>com.nyt.mpt.domain.RateConfig</value>
+				<value>com.nyt.mpt.domain.ProposalHead</value>
+				<value>com.nyt.mpt.domain.ProposalHeadAttributes</value>
+				<value>com.nyt.mpt.domain.Tier</value>
+				<value>com.nyt.mpt.domain.TierSectionAssoc</value>
+				<value>com.nyt.mpt.domain.TierPremium</value>
+				<value>com.nyt.mpt.domain.Notes</value>
+				<value>com.nyt.mpt.domain.LineItemReservations</value>
+				<value>com.nyt.mpt.domain.RateProfileSeasonalDiscounts</value>
+				<value>com.nyt.mpt.domain.AddedValueBudget</value>
+				<value>com.nyt.mpt.domain.SalesforceProposalEmailFlag</value>
+				<value>com.nyt.mpt.domain.UserFilter</value>
+				<value>com.nyt.mpt.domain.PackageSalesCategoryAssoc</value>
+				<value>com.nyt.mpt.domain.EmailSchedule</value>
+				<value>com.nyt.mpt.domain.EmailScheduleDetails</value>
+			</list>
+		</property>
+	</bean>
+</beans>

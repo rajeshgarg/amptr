@@ -1,0 +1,243 @@
+/**
+ *
+ */
+package com.nyt.mpt.dao;
+
+import java.util.List;
+import java.util.Map;
+
+import com.nyt.mpt.domain.ClusterSalesTarget;
+import com.nyt.mpt.domain.PrimaryPageGroup;
+import com.nyt.mpt.domain.Product;
+import com.nyt.mpt.domain.ProductPosition;
+import com.nyt.mpt.domain.SalesTarget;
+import com.nyt.mpt.domain.SalesTargetType;
+import com.nyt.mpt.util.PaginationCriteria;
+import com.nyt.mpt.util.SortingCriteria;
+import com.nyt.mpt.util.filter.FilterCriteria;
+
+/**
+ * This interface declare Product related methods.
+ *
+ * @author surendra.singh
+ */
+public interface IProductDAO {
+	
+	/**
+	 * Return list of filtered product.
+	 *
+	 * @param searchGridParams the search grid params
+	 * @param pageCriteria the page criteria
+	 * @param sortCriteria the sort criteria
+	 * @return the product filtered list
+	 */
+	List<Product> getProductFilteredList(final FilterCriteria searchGridParams, final PaginationCriteria pageCriteria, final SortingCriteria sortCriteria);
+
+	/**
+	 * Return count of product based on filter criteria.
+	 *
+	 * @param searchGridParams the search grid params
+	 * @return Integer
+	 */
+	Integer getProductFilteredListcount(final FilterCriteria searchGridParams);
+
+	/**
+	 * Function to retrieve sales target for the selected product.
+	 *
+	 * @param productId the product id
+	 * @return List<SalesTarget>
+	 */
+	List<SalesTarget> getSalesTarget(final Long productId);
+
+	/**
+	 * Return list of all sales target for given type.
+	 *
+	 * @param targetType the target type
+	 * @return List<SalesTarget>
+	 */
+	List<SalesTarget> getSalesTargetByType(final Long targetType);
+
+	/**
+	 * Return list of sales target type.
+	 *
+	 * @return List<SalesTargetType>
+	 */
+	List<SalesTargetType> getAllSalesTargetType();
+
+	/**
+	 * Return Cluster Sales Target based on sales target id.
+	 *
+	 * @param salesTargetId the sales target id
+	 * @return List<ClusterSalesTarget>
+	 */
+	List<ClusterSalesTarget> getClusterSalesTargetsBySalesTargetId(final long salesTargetId);
+
+	/**
+	 * Return product for product id.
+	 *
+	 * @param productId the product id
+	 * @return Product
+	 */
+	Product getProductById(final Long productId);
+
+	/**
+	 * Return sales target for id.
+	 *
+	 * @param salesTargetId the sales target id
+	 * @return SalesTarget
+	 */
+	SalesTarget getSalesTargetById(final Long salesTargetId);
+
+	/**
+	 * Return list of all active products.
+	 *
+	 * @return List<Product>
+	 */
+	List<Product> getAllProducts();
+
+	/**
+	 * Return Active and InActive Both Product based on product IDs.
+	 *
+	 * @param productIdList the product id list
+	 * @return List<Product>
+	 */
+	List<Product> getActiveInActiveProductsByProductIds(final List<Long> productIdList);
+
+	/**
+	 * Return list of all product class.
+	 *
+	 * @return Map<Long, String>
+	 */
+	Map<Long, String> getProductClass();
+	
+	/**
+	 * Return list of all product class.
+	 * @return Map<String, Long>
+	 */
+	Map<String, Long> getProductsClassMap();
+
+	/**
+	 * Return Map of ProductName on basis of sales target.
+	 *
+	 * @param salesTargetId the sales target id
+	 * @return Map<Long, String>
+	 */
+	Map<Long, String> getAllProductsForSalesTarget(final long salesTargetId);
+
+	/**
+	 * Return PrimaryPageGroup based on sales Target Id.
+	 *
+	 * @param salesTargetId the sales target id
+	 * @return PrimaryPageGroup
+	 */
+	PrimaryPageGroup getPrimaryPageGroupBySalesTargetId(final long salesTargetId);
+
+	/**
+	 * Return List of Primary Page Group based on sales target Ids.
+	 *
+	 * @param salesTargetIds the sales target ids
+	 * @return List<PrimaryPageGroup>
+	 */
+	List<PrimaryPageGroup> getPrimaryPageGroupBySalesTargetIds(final Long[] salesTargetIds);
+
+	/**
+	 * Return ProductPosition List based on Product Id.
+	 *
+	 * @param productId the product id
+	 * @return List<ProductPosition>
+	 */
+	List<ProductPosition> getProductPositionsByProductId(final long productId);
+
+	/**
+	 * Gets the all sales target for multi target type.
+	 *
+	 * @param saleTargetTypeIds the sale target type ids
+	 * @return the all sales target for multi target type
+	 */
+	List<SalesTarget> getAllSalesTargetForMultiTargetType(final Long[] saleTargetTypeIds);
+
+	/**
+	 * Gets the all products for multi sales target.
+	 *
+	 * @param saleTargetTypeLst the sale target type lst
+	 * @return the all products for multi sales target
+	 */
+	Map<Long, String> getAllProductsForMultiSalesTarget(final List<Long> saleTargetTypeLst);
+
+	/**
+	 * Gets the parent sales target id.
+	 *
+	 * @param saleTargetTypeLst the sale target type lst
+	 * @return the parent sales target id
+	 */
+	Map<Long, Long> getParentSalesTargetId(final List<Long> saleTargetTypeLst);
+
+	/**
+	 * Return list of sales target based on searched product.
+	 *
+	 * @param productID the product id
+	 * @return List<SalesTarget>
+	 */
+	List<SalesTarget> getSalesTargetFromProductID(final Long productID);
+
+	/**
+	 * Return list of product based on search string.
+	 *
+	 * @param productName the product name
+	 * @return List<Product>
+	 */
+	List<Product> getProductsBySearchString(final String productName);
+
+	/**
+	 * Return list of all active Reservable products.
+	 *
+	 * @param isReservable the is reservable
+	 * @return List<Product>
+	 */
+	List<Product> getAllReservableProducts(final boolean isReservable);
+
+	/**
+	 * Return list of inactive product ids.
+	 *
+	 * @return the inactive products
+	 */
+	List<Long> getInactiveProducts();
+	
+	/**
+	 * Returns all products and sales target combinations.
+	 *
+	 * @return the all sales targets and products
+	 */
+	Map<Long, Map<Long, String>> getAllSalesTargetsAndProducts();
+	
+	/**
+	 * Return Inactive product for product id.
+	 *
+	 * @param productId the product id
+	 * @return Product
+	 */
+	Product getInactiveProductById(final Long productId);
+	
+	/**
+	 * Gets the all reservable products by availsSystemId.
+	 *
+	 * @param availsSystemId
+	 * @param reservable the reservable
+	 * @return the all reservable products by produt id
+	 */
+	Map<Long, String> getProductsByAvailsId(final long availsSystemId, final boolean reservable);
+	
+	/**
+	 * Get all Sales Target for multiple products.
+	 * @param productIdLst - List of product Id's whose sales target has to be fetched.
+	 * @return The list of Sales Target
+	 */
+	List<SalesTarget> getAllSalesTargetForMultiProduct(final List<Long> productIdLst);
+	
+	/**
+	 * Fetches the list of the product class Ids based  on the list of the product display names.
+	 * @param prdClassDisplayNameLst
+	 * @return
+	 */
+	List<Long> getProductClassIdLstByDisplayName(List<String> prdClassDisplayNameLst);
+}

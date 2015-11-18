@@ -1,0 +1,256 @@
+/**
+ * 
+ */
+package com.nyt.mpt.service.impl;
+
+import java.text.SimpleDateFormat;
+import java.util.List;
+import java.util.Map;
+
+import com.nyt.mpt.dao.IAuditDAO;
+import com.nyt.mpt.domain.Audit;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.Proposal;
+import com.nyt.mpt.domain.ProposalOption;
+import com.nyt.mpt.domain.ProposalVersion;
+import com.nyt.mpt.domain.User;
+import com.nyt.mpt.service.IAuditService;
+import com.nyt.mpt.service.IProductService;
+import com.nyt.mpt.service.ISalesForceProposalService;
+import com.nyt.mpt.service.IUserService;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.DateUtil;
+import com.nyt.mpt.util.enums.ProposalStatus;
+import com.nyt.mpt.util.exception.CustomCheckedException;
+import com.nyt.mpt.util.security.SecurityUtil;
+import com.sforce.soap.enterprise.sobject.Ad_Systems_Workflow_Update__c;
+import com.sforce.soap.enterprise.sobject.Media_Plan_Revision__c;
+import com.sforce.soap.enterprise.sobject.Media_Plan__c;
+
+/**
+ * @author amandeep.singh
+ *
+ */
+public class AuditService implements IAuditService {
+	
+	private IAuditDAO auditDAO;
+	
+	private IUserService userService;
+
+	private ISalesForceProposalService salesForceProposalService;
+	
+	private IProductService productService;
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#create(com.nyt.mpt.domain.Audit)
+	 */
+	@Override
+	public Audit create(Audit audit) {
+		return auditDAO.create(audit);
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForNewProposal(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public void createAuditForNewProposal(Proposal proposal){
+		String msg = "";
+		if(proposal.getClonedFromProposalVersion() == null){
+			msg = "New proposal created.";
+		}else{
+			msg = "New proposal cloned.";
+		}
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), msg));
+	}
+	
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForNewOption(com.nyt.mpt.domain.ProposalOption)
+	 */
+	@Override
+	public void createAuditForNewOption(ProposalOption propOption) {
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSALOPTION, propOption.getId(), propOption.getProposal().getId(), "New option '" + propOption.getName() +"' created."));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForDeleteOption(com.nyt.mpt.domain.ProposalOption)
+	 */
+	@Override
+	public void createAuditForDeleteOption(ProposalOption propOption) {
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSALOPTION, propOption.getId(), propOption.getProposal().getId(), "Option '" + propOption.getName() +"' deleted."));		
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForNewVersion(com.nyt.mpt.domain.ProposalVersion)
+	 */
+	@Override
+	public void createAuditForNewVersion(Long proposalId, ProposalVersion propVersion) {
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.OPTIONVERSION, propVersion.getId(),proposalId, "New version created for option '" + propVersion.getProposalOption().getName() +"'."));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForAssigningProposal(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public void createAuditForAssigningProposal(Proposal proposal, User fromUser) {
+		if(proposal.getAssignedUser() == null){
+			create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(),  proposal.getId(), "Proposal assigned from " + fromUser.getFullName() +" to unassinged."));
+		} else {
+			User user = userService.getUserById(proposal.getAssignedUser().getUserId());
+			String fulName = fromUser == null ? ConstantStrings.EMPTY_STRING : "from " + fromUser.getFullName();
+			create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(),  proposal.getId(), "Proposal assigned " + fulName +" to "+ user.getFullName()+"."));
+		}
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForUpdateProposal(com.nyt.mpt.domain.Proposal, com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public void createAuditForUpdateProposal(Proposal proposalOld, Proposal proposalNew) {
+		StringBuilder message = new StringBuilder();
+		if(proposalOld.getDueDate().getTime() != proposalNew.getDueDate().getTime()){
+			message = message.append("'Due Date', ");
+		}
+		if (!proposalOld.getSosSalesCategoryId().equals(proposalNew.getSosSalesCategoryId())) {
+			message = message.append("'Sales Category', ");
+		}
+		if (proposalOld.getPriceType() != null && !proposalOld.getPriceType().equalsIgnoreCase(proposalNew.getPriceType())) {
+			message = message.append("'Price Type', ");
+		}
+		if(proposalOld.getSosAdvertiserId() == null && proposalNew.getSosAdvertiserId() != null){
+			message = message.append("'Advertiser', ");
+		} else if (proposalOld.getSosAdvertiserId() != null && !proposalOld.getSosAdvertiserId().equals(proposalNew.getSosAdvertiserId())) {
+			message = message.append("'Advertiser', ");
+		}
+		if(message.length()>0){
+			message = message.replace(0, 0, "Updated ");
+			message = message.deleteCharAt(message.lastIndexOf(ConstantStrings.COMMA));
+			message = message.append("of the proposal.");
+			create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposalOld.getId(), proposalOld.getId(), message.toString()));
+		}
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForProposalStaus(long, com.nyt.mpt.util.enums.ProposalStatus)
+	 */
+	@Override
+	public void createAuditForProposalStaus(long proposalId, ProposalStatus fromStatus ,ProposalStatus toStatus) {
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposalId, proposalId, "Proposal status changed from "+ fromStatus.getDisplayName() +" to "+ toStatus.getDisplayName() +"."));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#getAuditsByParentId(long)
+	 */
+	@Override
+	public List<Audit> getAuditsByParentId(long parentId) {
+		return auditDAO.getAuditsByParentId(parentId);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForPricingReview(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public Audit createAuditForPricingReview(Proposal proposal) {
+		return create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "Proposal submitted for pricing review."));
+	}
+
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForPricingReview(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public Audit createAuditForVulnerableProposalHomePageReservation(Proposal proposal,String lineItemIds) {
+		return create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "Notification mail sent for vulnerable home page reservations-"+lineItemIds ));
+	}
+
+	
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForProposalBackToPlanner(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public Audit createAuditForProposalBackToPlanner(Proposal proposal) {
+		return create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "Proposal submitted back to planner."));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForNewProposalFromSalesforce(com.nyt.mpt.domain.Proposal, com.sforce.soap.enterprise.sobject.Media_Plan__c)
+	 */
+	@Override
+	public void createAuditForNewProposalFromSalesforce(Proposal proposal,Media_Plan__c sfProposal){
+		String msg = ConstantStrings.EMPTY_STRING;
+		if(proposal.getClonedFromProposalVersion() == null){
+			msg = "New proposal created From Salesforce.";
+		} else {
+			msg = "New proposal cloned.";
+		}
+		create(new Audit(0, DateUtil.getCurrentDate(), sfProposal.getCreatedBy().getName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), msg));
+	}
+	
+	@Override
+	public void createAuditForNewProposalRevisionFromSalesforce(Proposal proposal,Media_Plan_Revision__c proposalRevision){
+		create(new Audit(0, DateUtil.getCurrentDate(), proposalRevision.getCreatedBy().getName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "New proposal Revision created From Salesforce."));
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#salesforceAuditLog(com.nyt.mpt.domain.Proposal, java.lang.StringBuilder)
+	 */
+	@Override
+	public void salesforceAuditLog(final Proposal proposalDb, final StringBuilder message) throws CustomCheckedException {
+		final Ad_Systems_Workflow_Update__c eventAuditLog = new Ad_Systems_Workflow_Update__c();
+		final User user = SecurityUtil.getUser();
+		eventAuditLog.setAction__c(message.toString());
+		eventAuditLog.setDate__c(DateUtil.dateTypeToCalendar(DateUtil.getCurrentDate()));
+		eventAuditLog.setUser__c(user.getFullName());
+		eventAuditLog.setProposal__c(proposalDb.getSalesforceID());
+		salesForceProposalService.saveProposalAuditLogInSalesforce(eventAuditLog);
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForNewSalesforceID(java.lang.String, com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public void createAuditForNewSalesforceID(Proposal proposal) throws CustomCheckedException{
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "Proposal linked to Salesforce Id - "+ proposal.getSalesforceID()));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditOldSalesforceProposal(com.nyt.mpt.domain.Proposal)
+	 */
+	@Override
+	public void createAuditOldSalesforceProposal(String newSalesforceId, Proposal proposal) throws CustomCheckedException{
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.PROPOSAL, proposal.getId(), proposal.getId(), "Proposal de-linked from Salesforce Id - "+ newSalesforceId));
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IAuditService#createAuditForHomePageResrvtnDltd(com.nyt.mpt.domain.LineItem)
+	 */
+	@Override
+	public void createAuditMessageForHomePageResrvtn(LineItem lineItem,String msg) throws CustomCheckedException{
+		SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy");
+		String flightString = ConstantStrings.EMPTY_STRING;
+		if(lineItem.getStartDate() != null && lineItem.getEndDate() !=null){
+			flightString = format.format(lineItem.getStartDate()) + " - "+format.format(lineItem.getEndDate());
+		}else{
+			flightString = lineItem.getFlight();
+		}
+		Map<Long, String> productClassMap = productService.getProductClass();
+		String productClass = (productClassMap.get(lineItem.getSosProductClass()).equals("HOME PAGE") ? ConstantStrings.PRODUCT_CLASS_HOME_PAGE :  ConstantStrings.PRODUCT_CLASS_DISPLAY_CROSS_PLATFORM);
+		create(new Audit(0, DateUtil.getCurrentDate(), SecurityUtil.getUser().getFullName(), ConstantStrings.LINEITEM, lineItem.getLineItemID(), lineItem.getProposalId(), productClass +" reservation "+msg+" with details: "+lineItem.getProductName()+", "+lineItem.getLineItemSalesTargetAssocs().get(0).getSosSalesTargetName()+", "+  flightString));
+	}
+	public void setAuditDAO(IAuditDAO auditDAO) {
+		this.auditDAO = auditDAO;
+	}
+
+	public void setUserService(IUserService userService) {
+		this.userService = userService;
+	}
+
+	public void setSalesForceProposalService(ISalesForceProposalService salesForceProposalService) {
+		this.salesForceProposalService = salesForceProposalService;
+	}
+
+	public void setProductService(IProductService productService) {
+		this.productService = productService;
+	}
+}

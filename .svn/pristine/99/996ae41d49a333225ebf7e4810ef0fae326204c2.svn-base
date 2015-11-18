@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-3.0.xsd 
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.0.xsd">
+
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:serviceConfig.properties</value>
+				<value>file:${password.properties}</value>
+				<value>file:${env.properties}</value>
+			</list>
+		</property>
+	</bean>
+	
+	<bean name="databaseHeartBeatJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.DatabaseHeartBeatJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="databaseHeartBeatSchedularDAO" value-ref="databaseHeartBeatSchedularDAO" />
+				<entry key="oDSDatabaseHeartBeatSchedularDAO" value-ref="oDSDatabaseHeartBeatSchedularDAO" />
+				<entry key="sosDatabaseHeartBeatSchedularDAO" value-ref="sosDatabaseHeartBeatSchedularDAO" />
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="weightCalculationQuartleyJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.SectionWeightCalculationJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="mailUtil" value-ref="mailUtil" />
+				<entry key="mailProps" value-ref="mailProps" />
+				<entry key="helper" value-ref="yieldexHelper" />
+				<entry key="cronService" value-ref="cronService" />
+				<entry key="yieldexService" value-ref="yieldexService" />				
+				<entry key="salesTargetService" value-ref="salesTargetService" />
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="vulnerableHomePageReservationJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.VulnerableHomePageReservationJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="proposalService" value-ref="proposalService"/>
+				<entry key="mailUtil" value-ref="mailUtil" />
+				<entry key="applicationURL" value="${application.url}" />
+				<entry key="homePageRreservationEmailFrom" value="${calendar.reservation.job.email.from}" /> 
+				<entry key="sosService" value-ref="sosService"/>
+				<entry key="proposalUtilService" value-ref="proposalUtilService" />
+				<entry key="cronService" value-ref="cronService" />
+				<entry key="proposalSOSService" value-ref="proposalSOSService"/>
+				<entry key="productService" value-ref="productService"/>
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="vulnerableProposalHomePageReservationJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.VulnerableProposalHomePageReservationJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="proposalService" value-ref="proposalService"/>
+				<entry key="reservationService" value-ref="reservationService"/>
+				<entry key="sosService" value-ref="sosService"/>
+				<entry key="proposalSOSService" value-ref="proposalSOSService"/>
+				<entry key="homePageRreservationEmailFrom" value="${calendar.reservation.job.email.from}" />
+				<entry key="mailUtil" value-ref="mailUtil" />
+				<entry key="applicationURL" value="${application.url}" />
+				<entry key="auditService" value-ref="auditService" />
+				<entry key="cronService" value-ref="cronService" />
+				<entry key="productService" value-ref="productService"/>
+			</map>
+		</property>
+	</bean>
+	
+	
+	
+	
+	<bean name="calendarReservationJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.CalendarReservationJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="cronService" value-ref="cronService" />
+				<entry key="proposalUtilService" value-ref="proposalUtilService" />
+				<entry key="proposalService" value-ref="proposalService" />
+				<entry key="userService" value-ref="userService" />
+				<entry key="mailUtil" value-ref="mailUtil" />
+				<entry key="sosService" value-ref="sosService" />
+				<entry key="applicationURL" value="${application.url}" />
+				<entry key="calendarRreservationEmailFrom" value="${calendar.reservation.job.email.from}" /> 
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="expiredProposalStatusUpdateJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.ExpiredProposalStatusUpdateJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="proposalService" value-ref="proposalService" />
+				<entry key="cronService" value-ref="cronService" />
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="salesForcePropsalIntegrationJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.SalesForcePropsalIntegrationJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="sfProposalService" value-ref="salesForceProposalService" />
+				<entry key="sfProposalHelper" value-ref="salesForceProposalServiceHelper" />
+				<entry key="cronService" value-ref="cronService" />
+			</map>
+		</property>
+	</bean>
+	
+	<bean name="deleteInactiveProductAssocJob" class="org.springframework.scheduling.quartz.JobDetailBean">
+		<property name="jobClass" value="com.nyt.mpt.util.cron.DeleteInactiveProductAssocJob" />
+		<property name="jobDataAsMap">
+			<map>
+				<entry key="productService" value-ref="productService" />
+				<entry key="cronService" value-ref="cronService" />
+			</map>
+		</property>
+	</bean>
+
+
+	<!-- 0 15 10 ? * MON-FRI	Fire at 10:15am every Monday, Tuesday, Wednesday, Thursday and Friday -->
+
+
+	<bean id="vulnerableHomePageReservationJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="vulnerableHomePageReservationJob" />
+		<!-- <property name="cronExpression" value="0 0 0 ? * MON" /> -->
+		<property name="cronExpression" value="0 0 5 ? * MON" />
+	</bean>
+	
+	
+	<bean id="vulnerableProposalHomePageReservationJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="vulnerableProposalHomePageReservationJob" />
+	 	   <!-- <property name="cronExpression" value="0 0/3 * * * ?" /> -->  
+		   <property name="cronExpression" value="0 0 5 * * ?" />
+	</bean>
+	
+	<bean id="databaseHeartBeatJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="databaseHeartBeatJob" />
+		<property name="cronExpression" value="0 */2 * * * ?" />
+	</bean>
+	
+	<bean id="weightCalculationQuartleyJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="weightCalculationQuartleyJob" />
+		<property name="cronExpression" value="0 0 0 * * ?" />
+	</bean>
+	
+	<bean id="expiredProposalStatusUpdateJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="expiredProposalStatusUpdateJob" />
+		<property name="cronExpression" value="0 0 0 * * ?" />
+	</bean>
+	
+	<bean id="calendarReservationJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="calendarReservationJob" />
+		<property name="cronExpression" value="0 0 0 * * ?"  />
+		 
+	</bean>
+
+	<bean id="deleteInactiveProductAssocJobSchedularTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="deleteInactiveProductAssocJob" />
+		<property name="cronExpression" value="0 0 0 * * ?"  />
+	</bean>
+	
+	<bean id="salesForcePropsalIntegrationJobTrigger" class="org.springframework.scheduling.quartz.CronTriggerBean">
+		<property name="jobDetail" ref="salesForcePropsalIntegrationJob" />
+		<property name="cronExpression" value="0 */10 * * * ?"  />
+	</bean>
+	
+	<!--  Registering job details and triggers in life-cycle Quartz scheduler  -->
+	<bean id="quartzSchedular" class="org.springframework.scheduling.quartz.SchedulerFactoryBean" destroy-method="destroy">
+		<property name="waitForJobsToCompleteOnShutdown" value="true"></property>
+		<property name="triggers">
+			<list>
+				<ref bean="databaseHeartBeatJobSchedularTrigger" />
+				<ref bean="weightCalculationQuartleyJobSchedularTrigger" />
+				<ref bean="expiredProposalStatusUpdateJobSchedularTrigger" />
+				<ref bean="calendarReservationJobSchedularTrigger" />
+				<ref bean="deleteInactiveProductAssocJobSchedularTrigger" />
+				<ref bean="salesForcePropsalIntegrationJobTrigger" />
+				<ref bean="vulnerableHomePageReservationJobSchedularTrigger" />
+				<ref bean="vulnerableProposalHomePageReservationJobSchedularTrigger"/>
+				
+			</list>
+		</property>
+	</bean>
+
+	<util:map id="mailProps">
+		<entry key="mailTo" value="${section.weight.job.email.to}"></entry>
+		<entry key="mailFrom" value="${section.weight.job.email.from}"></entry>
+	</util:map>
+
+</beans>

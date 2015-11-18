@@ -1,0 +1,217 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Ad</title>
+<meta http-equiv="content-type"
+	content="text/html; charset=windows-1252">
+	<script type="text/javascript">
+		/**
+		 * Function to close the current window
+		 */
+		function closeWindow() {
+			window.close();
+		}
+	</script>
+	<body>
+		<div class="pricing-help-text">
+			<div>
+				<h1>Pricing statuses in AMPT</h1>
+				<br />
+				<p><b>PRE-APPROVED RATES: </b>A line item with an offered rate that is
+					equal to the corresponding list rate or an applicable category rate
+					is marked as "System Approved."</p>
+					<ol type="A">
+						<li>List rates may have changed
+					slightly (based on new calculation of section weights) between the
+					time the rate card rate was last checked at the line item level and
+					the time it is recalculated as part of a revision.</li>
+						<li>To mitigate
+					slight variations in rates, the system rules will build in a slight
+					% variation ("tolerance") between offered rate and rate card rate
+					that is acceptable in terms of granting "system approval". AMPT is
+					currently considering 5% as the max tolerance limit.</li>
+						<li>Line items
+					from packages with pre-defined rates are also "System Approved".
+					However once package line is copied to a proposal, any further
+					changes on that line should lead to the status of that line being
+					evaluated again. During bulk update of rate card, system will check
+					if rate card price for package line item has changed or not, if
+					yes, then the status will be evaluated again. </li>
+					<li>A line item with
+					an offered rate that is below list or category rate but is for an
+					advertiser that has been flagged as having an external rate
+					contract is marked as " System Approved".
+						<ul>
+							<li>External ratecard/contract" flag is managed at an advertiser or category level</li>
+							<li>Expiration dates for these flags can be set</li>
+						</ul>
+						<div class="clearboth"></div>
+					</li>
+					<li>Line items with Flat Rate as type are automatically "System Approved".</li>
+					</ol> 
+					<p><b>UNAPPROVED: </b>A line item with an offered rate that is below rate card rate which
+					exceeds the tolerance limit defined (currently at 5%) and is for an
+					advertiser without an external rate contract is marked as
+					"Unapproved."</p>
+					<p><b>PRICING MANAGER APPROVED: </b>A planner can move forward
+					and backward in the Proposal workflow but system will throw a
+					warning if any line item in that plan is unapproved. Any plan with
+					unapproved line items should be sent for the Pricing Review unless
+					there is an emergency. System's role will be only to display
+					warning for unapproved lines when they move forward or backward in
+					the workflow. When Pricing Manager reviews a plan, they can make
+					changes to any line and change the offered CPM. The crucial point
+					is that when they submit the proposal back to planning team, there
+					will be a pop-up coming up in front of them where they are expected
+					to choose the options they have reviewed and against each chosen
+					Option, they need to specify the minimum threshold value under
+					which all "Pricing Approved" need to be checked again for
+					thresholds. System will calculate the total value of qualifying
+					lines in each option (which excludes the Added Value and Flat Rate
+					and Pre-emptible lines) and then deduct this value by a standard
+					defined percentage which is 10% and suggest the same in the popup.
+					Pricing Managers can obviously over-ride the suggested value and
+					define their own threshold value but that value cannot be more than
+					the total value of the qualifying lines for that option.</p>
+					<p>To explain it further, suppose pricing manager goes through all unapproved
+					lines and decides to change their CPM or create new lines.
+					Once they submit the plan back to the planning team, all the unapproved
+					lines (after all Pricing Manager changes) become "Pricing Approved"
+					automatically but at the same time Pricing Manager will provide a
+					condition where they will explicitly tell what should be the
+					minimum value for each plan option below which the "Pricing
+					Approved" lines will again become Unapproved or System Approved
+					based on the discount offered in those lines. Added Value lines
+					will also get Pricing Approval Status once Pricing Manage submits
+					the plan back to planning. However if any new Added Value line gets
+					added at a later stage, then system will check its
+					approval/rejection through normal added value rules. The pricing
+					approved added-value lines will only be evaluated if the value of
+					the option falls below threshold.</p>
+					<p>When Pricing Manager will submit
+					Proposal back to planning team, planner can change it in whatever
+					way they want BUT whatever lines which are marked as Pricing
+					Approved will be read only for all other roles including Admins.
+					This means that whenever planner will work on a Pricing Approved
+					line, they cannot change anything on the UI except the start date,
+					end date and impressions. Once planner is done with all the
+					changes, they can submit to pricing again or move it further in the
+					workflow. While moving forward or backward in the workflow, system
+					will check if a plan option value of the qualifying lines (which
+					excludes the Added Value and Flat Rate and Pre-emptible lines) is
+					less than what was given as minimum threshold by the Pricing
+					Manager. If overall value comes less, then all Pricing Approved
+					lines will be re-evaluated again to decide whether they are system
+					approved or un-approved. Bulk update of pricing overall should also
+					refresh the base price of a pricing approved line. However that
+					refresh should not affect the Pricing Approval status which will be
+					only evaluated when the total worth of qualifying lines goes below
+					the minimum threshold set by the Pricing Manager during the last
+					pricing review.</p>
+			</div>
+			<div class="clearboth"></div>
+			<div>
+				<h1 style="margin-top:10px;">Pricing Status evaluation during different events in AMPT</h1>
+				<ul>
+					<li>All the pricing status obviously becomes null and void if
+						the sales category or the advertiser of the proposal is changed
+						and everything is evaluated again.</li>
+					<li>Line item with no rate card price is considered as
+						Unapproved by default.</li>
+					<li>If a plan option is revised, pricing status in all the
+						line items will be copied from the original version to the new
+						version.</li>
+					<li>If a line item is cloned within a plan option, the status
+						of the cloned line is calculated in a fresh way.</li>
+					<li>If a proposal is cloned, pricing status of all the lines
+						will be re-evaluated again. The rate card will also be refreshed
+						for the cloned lines but the CPM will stay same.</li>
+					<li>If a reservation is moved between Proposals, the rate card
+						price as well as pricing status in the copied line will be
+						refreshed again as per the target proposal. The CPM will stay
+						same.</li>
+				</ul>
+			</div>
+			<div>
+				<br />
+				<h1>Added Value Rules</h1>
+				<p>A new screen has been added for the Administrators to setup
+					the Value Add thresholds allowed depending upon the total value of
+					the plan. Administrator are able to set up a rule that determines
+					the max $ amount of "Added Value" that can be "pre-approved" for a
+					plan option.For each rule, the administrator can define:</p>
+				<ul>
+					<li>The % of the total qualifying spend that can be offered as
+						added value</li>
+					<li>The amount of the qualifying spend (i.e., for a plan that
+						includes at least $50K of placements that qualify, added-value
+						worth 5% of the total value of the qualifying placements can be
+						included)</li>
+				</ul>
+				<p>The administrator can create rules for successively higher
+					threshold qualifying spends (e.g. for $50K, for $100K, for $150K,
+					for $500K, etc.) So they will have simple screen to configure the
+					data like:-</p>
+				<table style="margin-left: 6px;">
+					<thead>
+						<tr>
+							<td>Added Value Percentage Allowed</td>
+							<td>Plan Budget</td>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>5%</td>
+							<td>50,000</td>
+						</tr>
+						<tr>
+							<td>8%</td>
+							<td>80,000</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>
+					The trickiest aspect of this is that once the total value of the
+					pre-approved amount of added value has been calculated, AMPT must
+					reduce that amount by the total value of discounts applied to any
+					qualifying lines. Here is how this works:</p>
+					<ul>
+						<li>A plan has $50K of qualifying spend (spend without
+							pre-emptible and flat rates), and the administrator has set up 5%
+							pre-approved added value for such plans. This means that AT MOST,
+							the planner can offer added value worth $2,500.</li>
+						<li>All lines in the plan are offered at rate card EXCEPT
+							ONE.</li>
+						<li>The line that is offered at a discount is one of the
+							qualifying lines.</li>
+						<li>The rate card for this line is $30. The planner has
+							offered 40K impressions at $25, however, so the value of the
+							discount on that line is $200. This is arrived at by subtracting
+							the actual value of the line (25*40000/1000 = $1,000) from the
+							rate card value of the line (30*40000/1000 = $1,200).</li>
+						<li>Because one of the qualifying lines includes a $200
+							savings for the client, the total pre-approved amount of AV must
+							be reduced by $200 to $2,300.</li>
+					</ul>
+					<p>
+					Note that if any line item has CPM more than the rate card price,
+					then that will not affect the Added Value worth. This means that
+					Added Value worth will only focus on discounts offered and not on
+					any line item which has CPM higher than the Rate Card. Once a
+					dollar value for the amount of pre-approved added value has been
+					calculated for a specific plan option, AMPT will help the planner
+					determine how many impressions can be offered in the added-value
+					line item. This is accomplished by providing an icon next to
+					Offered Impression field on the line item screen where system will
+					suggest how many impressions can be offered based on the total
+					added value rules applicable. This value will be calculated based
+					on how much added value can be offered in the plan*1000/rate card.
+					The Added Value rules will be based on the entire plan option and
+					will be calculated whenever user saves a line. If the added value
+					rules get violated overall, all the added-value lines will
+					forcefully become "Unapproved".
+				</p>
+			</div>
+		</div>
+	</body>
+</html>

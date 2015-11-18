@@ -1,0 +1,601 @@
+/**
+ *
+ */
+package com.nyt.mpt.dao.impl;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.hibernate.FetchMode;
+import org.hibernate.Hibernate;
+import org.hibernate.SQLQuery;
+import org.hibernate.Session;
+import org.hibernate.criterion.CriteriaSpecification;
+import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.DetachedCriteria;
+import org.hibernate.criterion.Disjunction;
+import org.hibernate.criterion.LogicalExpression;
+import org.hibernate.criterion.MatchMode;
+import org.hibernate.criterion.Order;
+import org.hibernate.criterion.Restrictions;
+import org.hibernate.type.StandardBasicTypes;
+
+import com.nyt.mpt.dao.IPackageDAO;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.Package;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.CustomDbOrder;
+import com.nyt.mpt.util.DateUtil;
+import com.nyt.mpt.util.NumberUtil;
+import com.nyt.mpt.util.PaginationCriteria;
+import com.nyt.mpt.util.SortingCriteria;
+import com.nyt.mpt.util.enums.SearchOption;
+import com.nyt.mpt.util.filter.FilterCriteria;
+import com.nyt.mpt.util.filter.RangeFilterCriteria;
+import org.hibernate.criterion.Projections;
+import org.hibernate.criterion.Subqueries;
+import com.nyt.mpt.domain.PackageSalesCategoryAssoc;
+
+/**
+ * This DAO level class is used for Package related operation
+ *
+ * @author surendra.singh
+ *
+ */
+public class PackageDAO extends GenericDAOImpl implements IPackageDAO {
+
+	private static final String OWNER = "owner";
+
+	private static final String BUDGET = "budget";
+
+	private static final String VALID_TO = "validTo";
+
+	private static final Logger LOGGER = Logger.getLogger(PackageDAO.class);
+
+	private static final Map<String, String> FIELD_COLUMN_MAP = new HashMap<String, String>();
+
+	static {
+		FIELD_COLUMN_MAP.put("packageId", "id");
+		FIELD_COLUMN_MAP.put("packageName", ConstantStrings.NAME);
+		FIELD_COLUMN_MAP.put("packageOwner", "owner.firstName");
+		FIELD_COLUMN_MAP.put("createdBy", "createdBy");
+		FIELD_COLUMN_MAP.put("createdAt", "createdDate");
+		FIELD_COLUMN_MAP.put("modifiedBy", "modifiedBy");
+		FIELD_COLUMN_MAP.put("modifiedOn", "modifiedDate");
+		FIELD_COLUMN_MAP.put("validFrom", "validFrom");
+		FIELD_COLUMN_MAP.put(VALID_TO, VALID_TO);
+		FIELD_COLUMN_MAP.put("breakableStr", "breakable");
+		FIELD_COLUMN_MAP.put(BUDGET, BUDGET);
+		FIELD_COLUMN_MAP.put("lineItemCount", ConstantStrings.EMPTY_STRING);
+		FIELD_COLUMN_MAP.put("expired", ConstantStrings.EMPTY_STRING);
+		FIELD_COLUMN_MAP.put("packageSalescategoryName", "packageSalesCategoryAssoc.sosSalesCategoryName");
+		FIELD_COLUMN_MAP.put("packageSalescategory", "packageSalesCategoryAssoc.sosSalesCategoryId");
+	}
+
+	private static final Map<String, String> LINE_ITEM_MAP = new HashMap<String, String>();
+
+	static {
+		LINE_ITEM_MAP.put(ConstantStrings.NAME, "lineItemName");
+		LINE_ITEM_MAP.put("comments", "comments");
+		LINE_ITEM_MAP.put("startDate", "startDate");
+		LINE_ITEM_MAP.put("endDate", "endDate");
+		LINE_ITEM_MAP.put("flight", "flight");
+		LINE_ITEM_MAP.put("impressionTotal", "impressionTotal");
+		LINE_ITEM_MAP.put("lineItemID", "lineItemID");
+		LINE_ITEM_MAP.put("totalInvestment", "totalInvestment");
+		LINE_ITEM_MAP.put("rate", "rate");
+		LINE_ITEM_MAP.put("placementName", "placementName");
+		LINE_ITEM_MAP.put("lineItemSequence", "lineItemSequence");
+		LINE_ITEM_MAP.put("productName", "productName");
+		LINE_ITEM_MAP.put("viewableDisplayName", "isViewable");
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageDAO#getPackageList()
+	 */
+	@Override
+	@SuppressWarnings(ConstantStrings.UNCHECKED)
+	public List<Package> getFilteredPackageList(final FilterCriteria filterCriteria, final PaginationCriteria pageCriteria, final SortingCriteria sortingCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered Package List. Filter criteria: " + filterCriteria);
+		}
+		DetachedCriteria criteria = null;
+		try {
+			 criteria = constructFilterCriteria(filterCriteria);
+		} catch (NumberFormatException ex) {
+			return Collections.EMPTY_LIST;
+		} catch (IllegalArgumentException e) {
+			return Collections.EMPTY_LIST;
+		}
+		
+		if (sortingCriteria != null) {
+			//update the sorting field name in sorting criteria with DB column name 
+			sortingCriteria.setSortingField(FIELD_COLUMN_MAP.get(sortingCriteria.getSortingField()));
+			addSortingCriteria(criteria, sortingCriteria);
+		}
+		final List<Package> packageList = findByCriteria(criteria, pageCriteria);
+		for (Package packages : packageList) {
+			Hibernate.initialize(packages.getPackagelineItemSet());
+			Hibernate.initialize(packages.getPackageSalesCategoryAssoc());
+		}
+		return packageList;
+	}
+
+	/**
+	 * @param filterCriteria
+	 * @return
+	 */
+	private DetachedCriteria constructFilterCriteria(final FilterCriteria filterCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Constructing filter criteria: " + filterCriteria);
+		}
+		final DetachedCriteria criteria = DetachedCriteria.forClass(Package.class);
+		criteria.setResultTransformer(CriteriaSpecification.DISTINCT_ROOT_ENTITY);
+		criteria.add(Restrictions.eq(ConstantStrings.ACTIVE, true));
+		addFilterCriteria(filterCriteria, criteria);
+		return criteria;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getFilteredPackageListCount(com.nyt.mpt.util.FilterCriteria)
+	 */
+	@Override
+	public int getFilteredPackageListCount(final FilterCriteria filterCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered package list count. FilterCriteria: " + filterCriteria);
+		}
+		try {
+			return getCount(constructFilterCriteria(filterCriteria));
+		} catch (NumberFormatException ex) {
+			return 0;
+		} catch (IllegalArgumentException e) {
+			return 0;
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageDAO#getPackageById(long)
+	 */
+	@Override
+	public Package getPackageById(final long packageId) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Loading package by id: " + packageId);
+		}
+		return load(Package.class, packageId);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageDAO#savePackage(com.nyt.mpt.adpackage.AdPackage)
+	 */
+	@Override
+	public long savePackage(final Package adPackage) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving package with id: " + adPackage.getId());
+		}
+		saveOrUpdate(adPackage);
+		return adPackage.getId();
+	}
+
+	/**
+	 * @param filterCriteria
+	 * @param criteria
+	 */
+	private void addFilterCriteria(final FilterCriteria filterCriteria, final DetachedCriteria criteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Adding filter criteria: " + filterCriteria);
+		}
+		criteria.createAlias(OWNER, OWNER);
+		criteria.setFetchMode("owner.personalizationInfo", FetchMode.SELECT);
+		criteria.setFetchMode("owner.salesCategory", FetchMode.SELECT);
+		criteria.setFetchMode("owner.userRoles", FetchMode.SELECT);
+		if (filterCriteria != null && StringUtils.isNotBlank(filterCriteria.getSearchString())) {
+			if ("breakableStr".equals(filterCriteria.getSearchField())) {
+				if ("yes".equalsIgnoreCase(filterCriteria.getSearchString())) {
+					criteria.add(Restrictions.eq(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),true));
+					
+				}else if ("no".equalsIgnoreCase(filterCriteria.getSearchString())) {
+					criteria.add(Restrictions.eq(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),false));
+				}else{
+					throw new IllegalArgumentException();
+				}				
+			} else if ("packageOwner".equals(filterCriteria.getSearchField()) || "packageName".equals(filterCriteria.getSearchField()) ) {
+				if (SearchOption.CONTAIN.toString().equals(filterCriteria.getSearchOper())) {
+					criteria.add(Restrictions.ilike(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+							filterCriteria.getSearchString(), MatchMode.ANYWHERE));
+				} else if (SearchOption.EQUAL.toString().equals(filterCriteria.getSearchOper())) {
+					criteria.add(Restrictions.ilike(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+							filterCriteria.getSearchString(), MatchMode.EXACT));
+				} else if (SearchOption.BEGINS_WITH.toString().equals(filterCriteria.getSearchOper())) {
+					criteria.add(Restrictions.ilike(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+							filterCriteria.getSearchString(), MatchMode.START));
+				}
+			} else if("packageSalescategoryName".equals(filterCriteria.getSearchField())){
+				final DetachedCriteria subCriteria = DetachedCriteria.forClass(PackageSalesCategoryAssoc.class);
+				if (SearchOption.CONTAIN.toString().equals(filterCriteria.getSearchOper())) {
+					subCriteria.add(Restrictions.ilike("sosSalesCategoryName",
+							filterCriteria.getSearchString(), MatchMode.ANYWHERE));
+				} else if (SearchOption.EQUAL.toString().equals(filterCriteria.getSearchOper())) {
+					subCriteria.add(Restrictions.ilike("sosSalesCategoryName",
+							filterCriteria.getSearchString(), MatchMode.EXACT));
+				} else if (SearchOption.BEGINS_WITH.toString().equals(filterCriteria.getSearchOper())) {
+					subCriteria.add(Restrictions.ilike("sosSalesCategoryName",
+							filterCriteria.getSearchString(), MatchMode.START));
+				}
+				subCriteria.setProjection(Projections.property("packageObject.id"));
+				criteria.add(Subqueries.propertyIn("id", subCriteria));
+			
+			}else if(VALID_TO.equals(filterCriteria.getSearchField()) || "validFrom".equals(filterCriteria.getSearchField())) {
+				try {
+					criteria.add(Restrictions.eq(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+						DateUtil.parseToDate(filterCriteria.getSearchString())));
+				} catch (IllegalArgumentException e) {
+					LOGGER.info("Invalid search input for " + FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()) + " - "
+							+ filterCriteria.getSearchString());
+					throw e;
+				}
+			} else if (BUDGET.equals(filterCriteria.getSearchField())) {
+				try {
+					if(StringUtils.isNotBlank(filterCriteria.getSearchString())) {
+						criteria.add(Restrictions.eq(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+							Double.valueOf(filterCriteria.getSearchString())));
+					}
+				} catch (NumberFormatException ex) {
+					LOGGER.info("Invalid search input for " + FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()) + " - "
+							+ filterCriteria.getSearchString());
+					throw ex;
+				}
+			} else if ("expired".equals(filterCriteria.getSearchField())) {
+				if ("yes".equalsIgnoreCase(filterCriteria.getSearchString())) {
+					criteria.add(Restrictions.lt(FIELD_COLUMN_MAP.get(VALID_TO), DateUtil.getCurrentMidnightDate()));
+				} else if ("no".equalsIgnoreCase(filterCriteria.getSearchString())) {
+					final Criterion validToDate = Restrictions.ge(FIELD_COLUMN_MAP.get(VALID_TO), DateUtil.getCurrentMidnightDate());
+					final Criterion validToNull = Restrictions.isNull(FIELD_COLUMN_MAP.get(VALID_TO));
+
+					final LogicalExpression validToOrNull = Restrictions.or(validToDate, validToNull);
+					criteria.add(validToOrNull);
+				} else{
+					throw new IllegalArgumentException();
+				}
+			}
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#isDuplicatePackageName(java.lang.String, long)
+	 */
+	@Override
+	@SuppressWarnings(ConstantStrings.UNCHECKED)
+	public boolean isDuplicatePackageName(final String packageName, final long packageID) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Check for Duplicate package Name. packageName: " + packageName);
+		}
+		final DetachedCriteria criteria = DetachedCriteria.forClass(Package.class);
+		criteria.add(Restrictions.eq(ConstantStrings.ACTIVE, true));
+		criteria.add(Restrictions.eq(ConstantStrings.NAME, packageName).ignoreCase());
+		if (packageID != 0) {
+			criteria.add(Restrictions.ne("id", packageID));
+		}
+		final List<Package> list = findByCriteria(criteria);
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Count for package name '" + packageName + "' is: " + list.size());
+		}
+		if (list.isEmpty()) {
+			return false;
+		}
+		return true;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageLineItemsDAO#saveLineItems(com.nyt.mpt.adpackage.AdPackageLineItems)
+	 */
+	@Override
+	public Long saveLineItems(final LineItem lineItem) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving line Item with id: " + lineItem.getLineItemID());
+		}
+		save(lineItem);
+		return lineItem.getLineItemID();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.service.IPackageLineItemsService#getLineItemsListForPackage(java.lang.Long)
+	 */
+	@Override
+	@SuppressWarnings(ConstantStrings.UNCHECKED)
+	public List<LineItem> getFilteredPackageLineItems(final long packageId, final FilterCriteria filterCriteria,
+			final PaginationCriteria pageCriteria, final SortingCriteria sortCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered Package line items. filter criteria: " + filterCriteria);
+		}
+		final DetachedCriteria criteria = constructFilterCriteriaForLineItems(filterCriteria, packageId);
+		addSortingCriteria(criteria, sortCriteria, LINE_ITEM_MAP);
+		final List<LineItem> lineItemList = findByCriteria(criteria, pageCriteria);
+		for (LineItem lineItem : lineItemList) {
+			Hibernate.initialize(lineItem.getLineItemSalesTargetAssocs());
+			Hibernate.initialize(lineItem.getGeoTargetSet());			
+		}		
+		return lineItemList;
+	}
+
+	/**
+	 * @param criteria
+	 * @param sortingCriteria
+	 * @param map
+	 */
+	private void addSortingCriteria(final DetachedCriteria criteria, final SortingCriteria sortingCriteria, final Map<String, String> map) {
+		if (sortingCriteria == null) {
+			return;
+		}
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Adding sorting criteria: " + sortingCriteria);
+		}
+		final CustomDbOrder order = new CustomDbOrder();
+		order.setAscending(sortingCriteria.getSortingOrder().equals(CustomDbOrder.ASCENDING));
+		order.setFieldName(map.get(sortingCriteria.getSortingField()));
+		if ("lineItemSequence".equals(sortingCriteria.getSortingField())) {
+			final Order orderBy = order.isAscending() ? Order.asc("createdDate") : Order.desc("createdDate");
+			criteria.addOrder(order.getOrder()).addOrder(orderBy);
+		} else {
+			criteria.addOrder(order.getOrder());
+		}
+	}
+
+	/**
+	 * @param filterCriteria
+	 * @param packageId
+	 * @return
+	 */
+	private DetachedCriteria constructFilterCriteriaForLineItems(final FilterCriteria filterCriteria, final long packageId) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Constructing filter criteria for line item. FilterCriteria: " + filterCriteria + " Package id:" + packageId);
+		}
+		final DetachedCriteria criteria = DetachedCriteria.forClass(LineItem.class);
+		criteria.add(Restrictions.eq("packageObj.id", packageId));
+		criteria.add(Restrictions.isNull("proposalId"));
+		criteria.add(Restrictions.eq(ConstantStrings.ACTIVE, true));
+		return criteria;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.service.IPackageService#getFilteredPackageLineItemsCount(long, com.nyt.mpt.util.FilterCriteria)
+	 */
+	@Override
+	public int getFilteredPackageLineItemsCount(final long packageId, final FilterCriteria filterCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered package line items count. FilterCriteria: " + filterCriteria);
+		}
+		return getCount(constructFilterCriteriaForLineItems(filterCriteria, packageId));
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageLineItemsDAO#getLineItemById(java.lang.Long)
+	 */
+	@Override
+	public LineItem getLineItemById(final Long lineItemId) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching line Items by id. LineItemId: " + lineItemId);
+		}
+		final LineItem lineItem = (LineItem) findById(LineItem.class, lineItemId);
+		Hibernate.initialize(lineItem.getGeoTargetSet());
+		Hibernate.initialize(lineItem.getLineItemSalesTargetAssocs());
+		return lineItem;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.adpackage.dao.IPackageLineItemsDAO#deleteLineItems(com.nyt.mpt.adpackage.AdPackageLineItems)
+	 */
+	@Override
+	public Long updateLineItems(final LineItem lineItem) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Updating line Item with id: " + lineItem.getLineItemID());
+		}
+		update(lineItem);
+		return lineItem.getLineItemID();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getFilteredPackageList(java.util.List, com.nyt.mpt.util.PaginationCriteria, com.nyt.mpt.util.SortingCriteria)
+	 */
+	@Override
+	@SuppressWarnings(ConstantStrings.UNCHECKED)
+	public List<Package> getFilteredPackageList(final List<RangeFilterCriteria> criteriaList, final PaginationCriteria pageCriteria, final SortingCriteria sortCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered package list. FilterCriteriaList: " + criteriaList);
+		}
+		final DetachedCriteria criteria = constructFilterCriteriaForActivepackage(criteriaList);
+		
+		if (sortCriteria != null) {
+			//update the sorting field name in sorting criteria with DB column name 
+			sortCriteria.setSortingField(FIELD_COLUMN_MAP.get(sortCriteria.getSortingField()));
+			addSortingCriteria(criteria, sortCriteria);
+		}
+		final List<Package> packageList = findByCriteria(criteria, pageCriteria);
+		for (Package packages : packageList) {
+			Hibernate.initialize(packages.getPackagelineItemSet());
+			Hibernate.initialize(packages.getPackageSalesCategoryAssoc());
+		}
+		return packageList;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getFilteredPackageListCountHavingLineItems(java.util.List)
+	 */
+	@Override
+	public Integer getFilteredPackageListCountHavingLineItems(final List<RangeFilterCriteria> filterCriteriaLst) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching count of filtered package list having line items. FilterCriteriaList: " + filterCriteriaLst);
+		}
+		return getCount(constructFilterCriteriaForActivePackageHavingLineItem(filterCriteriaLst));
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getFilteredPackageListHavingLineItems(java.util.List, com.nyt.mpt.util.PaginationCriteria, com.nyt.mpt.util.SortingCriteria)
+	 */
+	@Override
+	@SuppressWarnings(ConstantStrings.UNCHECKED)
+	public List<Package> getFilteredPackageListHavingLineItems(final List<RangeFilterCriteria> criteriaList,
+			final PaginationCriteria pageCriteria, final SortingCriteria sortCriteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Fetching filtered package list having line items. FilterCriteriaList: " + criteriaList);
+		}
+		final DetachedCriteria criteria = constructFilterCriteriaForActivePackageHavingLineItem(criteriaList);
+		
+		if (sortCriteria != null) {
+			//update the sorting field name in sorting criteria with DB column name 
+			sortCriteria.setSortingField(FIELD_COLUMN_MAP.get(sortCriteria.getSortingField()));
+			addSortingCriteria(criteria, sortCriteria);
+		}
+		final List<Package> packageList = findByCriteria(criteria, pageCriteria);
+		for (Package packages : packageList) {
+			Hibernate.initialize(packages.getPackagelineItemSet());
+			Hibernate.initialize(packages.getPackageSalesCategoryAssoc());	
+		}
+		return packageList;
+	}
+
+	/**
+	 * @param filterCriteriaLst
+	 * @return
+	 */
+	private DetachedCriteria constructFilterCriteriaForActivePackageHavingLineItem(final List<RangeFilterCriteria> filterCriteriaLst) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Constructing FilterCriteria for active packages having LineItem. Filter Criteria: " + filterCriteriaLst);
+		}
+		final DetachedCriteria criteria = DetachedCriteria.forClass(Package.class);
+		criteria.setResultTransformer(CriteriaSpecification.DISTINCT_ROOT_ENTITY);
+		criteria.add(Restrictions.eq(ConstantStrings.ACTIVE, true));
+		addFilterCriteriaForLst(filterCriteriaLst, criteria);
+		return criteria;
+	}
+
+	/**
+	 * @param criteriaList
+	 * @return
+	 */
+	private DetachedCriteria constructFilterCriteriaForActivepackage(final List<RangeFilterCriteria> criteriaList) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Constructing FilterCriteria for active packages. FilterCriteria: " + criteriaList);
+		}
+		final DetachedCriteria criteria = DetachedCriteria.forClass(Package.class);
+		criteria.setResultTransformer(CriteriaSpecification.DISTINCT_ROOT_ENTITY);
+		criteria.add(Restrictions.eq(ConstantStrings.ACTIVE, true));
+		addFilterCriteriaForLst(criteriaList, criteria);
+		return criteria;
+	}
+
+	/**
+	 * @param criteriaList
+	 * @param criteria
+	 */
+	private void addFilterCriteriaForLst(final List<RangeFilterCriteria> criteriaList, final DetachedCriteria criteria) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Adding FilterCriteria for list. FilterCriteria: " + criteriaList);
+		}
+		criteria.createAlias(OWNER, OWNER);
+		criteria.setFetchMode("owner.personalizationInfo", FetchMode.SELECT);
+		criteria.setFetchMode("owner.salesCategory", FetchMode.SELECT);
+		criteria.setFetchMode("owner.userRoles", FetchMode.SELECT);
+
+		if (criteriaList != null && !criteriaList.isEmpty()) {
+			for (RangeFilterCriteria filterCriteria : criteriaList) {
+				if (filterCriteria != null && StringUtils.isNotBlank(filterCriteria.getSearchField())) {
+					if (SearchOption.CONTAIN.toString().equals(filterCriteria.getSearchOper())) {
+						criteria.add(Restrictions.ilike(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+								filterCriteria.getSearchString(), MatchMode.ANYWHERE));
+					} else if (SearchOption.BETWEEN.toString().equals(filterCriteria.getSearchOper())) {
+						if (BUDGET.equalsIgnoreCase(filterCriteria.getSearchField())) {
+							if (StringUtils.isNotBlank(filterCriteria.getSearchStringFrom())) {
+								criteria.add(Restrictions.ge(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+										NumberUtil.doubleValue(filterCriteria.getSearchStringFrom())));
+							}
+							if (StringUtils.isNotBlank(filterCriteria.getSearchStringTo())) {
+								criteria.add(Restrictions.le(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+										NumberUtil.doubleValue(filterCriteria.getSearchStringTo())));
+							}
+						} else if ("ValidFrom".equalsIgnoreCase(filterCriteria.getSearchField())) {
+							if (StringUtils.isNotBlank(filterCriteria.getSearchStringFrom())) {
+								criteria.add(Restrictions.ge(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+										DateUtil.parseToDate(filterCriteria.getSearchStringFrom())));
+							}
+						} else if ("ValidTo".equalsIgnoreCase(filterCriteria.getSearchField())) {
+							if (StringUtils.isNotBlank(filterCriteria.getSearchStringTo())) {
+								criteria.add(Restrictions.le(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+										DateUtil.parseToDate(filterCriteria.getSearchStringTo())));
+							}
+						} else {
+							criteria.add(Restrictions.ilike(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+									filterCriteria.getSearchString(), MatchMode.EXACT));
+						}
+					} else if (SearchOption.LESS.toString().equals(filterCriteria.getSearchOper())
+							&& "ValidTo".equalsIgnoreCase(filterCriteria.getSearchField())) {
+						criteria.add(Restrictions.le(FIELD_COLUMN_MAP.get(filterCriteria.getSearchField()),
+								DateUtil.parseToDate(filterCriteria.getSearchString())));
+					} else if (SearchOption.EQUAL.toString().equals(filterCriteria.getSearchOper())) {
+						if ("packageSalescategory".equalsIgnoreCase(filterCriteria.getSearchField())) {
+							final DetachedCriteria subCriteria = DetachedCriteria.forClass(PackageSalesCategoryAssoc.class);
+							Disjunction or = Restrictions.disjunction();
+							subCriteria.add(Restrictions.eq("sosSalesCategoryId", NumberUtil.longValue(filterCriteria.getSearchString())));
+							subCriteria.setProjection(Projections.property("packageObject.id"));
+							or.add(Subqueries.propertyIn("id", subCriteria));
+							
+							final DetachedCriteria salesCategorySubCriteria = DetachedCriteria.forClass(PackageSalesCategoryAssoc.class);
+							salesCategorySubCriteria.add(Restrictions.ne("sosSalesCategoryId", NumberUtil.longValue(filterCriteria.getSearchString())));
+							salesCategorySubCriteria.setProjection(Projections.property("packageObject.id"));
+							or.add(Subqueries.propertyNotIn("id", salesCategorySubCriteria));
+							criteria.add(or);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getMaxSequenceNoForLineItem(long)
+	 */
+	@Override
+	public int getMaxSequenceNoForLineItem(final long packageId) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Getting Max seq No For Package Line Item with package Id: " + packageId);
+		}
+		final String queryString = "select NVL(max(SEQ_NUMBER),0) AS SEQNO from {h-schema}MP_LINE_ITEMS LI where "
+			+ "LI.PROPOSAL_ID is NULL and LI.IS_ACTIVE = 1 and LI.PACKAGE_ID = :packageID";
+		final Session session = getHibernateTemplate().getSessionFactory().getCurrentSession();
+		final SQLQuery query = session.createSQLQuery(queryString);
+		query.setLong("packageID", packageId);
+		query.addScalar("SEQNO", StandardBasicTypes.INTEGER);
+		return (Integer) query.uniqueResult();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#getCompletePackageByID(long)
+	 */
+	@Override
+	public Package getCompletePackageByID(final long packageId) {
+		final Package adPckage = load(Package.class, packageId);
+		for (LineItem lineItem : adPckage.getPackagelineItemSet()) {
+			Hibernate.initialize(lineItem.getGeoTargetSet());
+			Hibernate.initialize(lineItem.getLineItemSalesTargetAssocs());
+		}
+		for(PackageSalesCategoryAssoc packageSalesCategoryAssoc:adPckage.getPackageSalesCategoryAssoc()){
+			Hibernate.initialize(packageSalesCategoryAssoc.getPackageObject());
+		}
+		getHibernateTemplate().getSessionFactory().getCurrentSession().evict(adPckage);
+		return adPckage;
+	}
+	/* (non-Javadoc)
+	 * @see com.nyt.mpt.dao.IPackageDAO#deleteSalesCategoryAssoc(com.nyt.mpt.domain.PackageSalesCategoryAssoc)
+	 */
+	@Override
+	public Long deleteSalesCategoryAssoc(final PackageSalesCategoryAssoc salesCategoryAssoc) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Deleting LineItem sales target association: " + salesCategoryAssoc.getId());
+		}
+		delete(salesCategoryAssoc);
+		return salesCategoryAssoc.getId();
+	}
+}

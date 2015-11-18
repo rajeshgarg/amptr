@@ -1,0 +1,613 @@
+/**
+ *
+ */
+package com.nyt.mpt.controller;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Logger;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.servlet.ModelAndView;
+
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.LineItemSalesTargetAssoc;
+import com.nyt.mpt.domain.LineItemTarget;
+import com.nyt.mpt.domain.Package;
+import com.nyt.mpt.domain.PricingCalculatorSummary;
+import com.nyt.mpt.domain.Product;
+import com.nyt.mpt.domain.ProductCreativeAssoc;
+import com.nyt.mpt.domain.RateProfileSummary;
+import com.nyt.mpt.domain.SalesTarget;
+import com.nyt.mpt.form.LineItemForm;
+import com.nyt.mpt.service.IPackageService;
+import com.nyt.mpt.service.IPricingCalculator;
+import com.nyt.mpt.service.IProductService;
+import com.nyt.mpt.service.IProposalSOSService;
+import com.nyt.mpt.service.IProposalService;
+import com.nyt.mpt.service.ISalesTargetService;
+import com.nyt.mpt.template.ReferenceDataMap;
+import com.nyt.mpt.util.AjaxFormSubmitResponse;
+import com.nyt.mpt.util.ConstantStrings;
+import com.nyt.mpt.util.Constants;
+import com.nyt.mpt.util.CustomBindingResult;
+import com.nyt.mpt.util.NumberUtil;
+import com.nyt.mpt.util.ProposalHelper;
+import com.nyt.mpt.util.StringUtil;
+import com.nyt.mpt.util.TableGrid;
+import com.nyt.mpt.util.TargetJsonConverter;
+import com.nyt.mpt.util.enums.ErrorCodes;
+import com.nyt.mpt.util.enums.LineItemProductTypeEnum;
+import com.nyt.mpt.util.enums.UserHelpCodes;
+import com.nyt.mpt.validator.PackageLineItemsFormValidator;
+
+/**
+ * This {@code PackageLineItemsController} class include all the methods for Managing Package's Line Items
+ * @author ankit.phanda
+ */
+
+@Controller
+@RequestMapping("/packagelineitems/*")
+public class PackageLineItemsController extends AbstractBaseController {
+
+	private static final String PRICE = "price";
+
+	private static final String PRICE_CAL_SUMMARY = "priceCalSummary";
+
+	private static final String PRICE_CAL_SUMMARY_VIEW = "priceCalSummaryStep";
+
+	private static final String SALE_SCATEGORY_ID = "salesCategoryId";
+	
+	private static final String CHILD_SALE_TARGET_IDS = "childSaleTargetIds";
+
+	private IPackageService packageService;
+
+	private ProposalHelper proposalHelper;
+
+	private IProposalService proposalService;
+
+	private IProposalSOSService proposalSOSService;
+
+	private TargetJsonConverter targetJsonConverter;
+
+	private IPricingCalculator pricingCalculator;
+
+	private ISalesTargetService salesTargetService;
+	
+	private IProductService productService;
+	
+	private static final Logger LOGGER = Logger.getLogger(PackageLineItemsController.class);
+	
+	/**
+	 * @param packageId
+	 * @param tblGrid
+	 * @return
+	 */
+	@RequestMapping("/loadLineItemsGridData")
+	public ModelAndView loadMasterGridData(@RequestParam("packageId") final Long packageId, @ModelAttribute final TableGrid<LineItemForm> tblGrid) {
+		final ModelAndView view = new ModelAndView("managePackageLineItemsGridData");
+		setGridData(tblGrid, packageId);
+		view.addObject(tblGrid);
+		return view;
+	}
+
+	/**
+	 * Deletes Package's Line Item/(s) {@link LineItem} from the database
+	 * @param 	lineItemIds
+	 * 			Line Items to be deleted
+	 * @param 	lineItemsForm
+	 * 			{@link LineItemFormi} has all the information related to Line Items
+	 * @return
+	 */
+	@ResponseBody
+	@RequestMapping("/deletePackageLineItem")
+	public AjaxFormSubmitResponse deletePackageLineItem(@RequestParam("lineItemIds") final String lineItemIds, final LineItemForm lineItemsForm) {
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Deleting package line items with lineItemIds: " + lineItemIds);
+		}
+		packageService.deleteLineItems(lineItemIds);
+		return ajaxResponse;
+	}
+
+	/**
+	 * Sets grid's data for selected {@link Package}
+	 * @param tblGrid
+	 * @param packageId
+	 */
+	private void setGridData(final TableGrid<LineItemForm> tblGrid, final Long packageId) {
+		final List<LineItem> lineItemsList = packageService.getFilteredPackageLineItems(
+				packageId, tblGrid.getFilterCriteria(), tblGrid.getPaginationCriteria(), tblGrid.getSortingCriteria());
+
+		if (!lineItemsList.isEmpty()) {
+			final int lineItemCount = packageService.getFilteredPackageLineItemsCount(packageId, tblGrid.getFilterCriteria());
+			tblGrid.setGridData(convertDtoToForm(lineItemsList), lineItemCount);
+		}
+	}
+
+	/**
+	 * Converting List of {@link LineItem} to List of {@link LineItemForm} for showing in the UI
+	 * @param lineItemsList
+	 * @return
+	 */
+	private List<LineItemForm> convertDtoToForm(final List<LineItem> lineItemsList) {
+		final List<LineItemForm> lineItemsFormList = new ArrayList<LineItemForm>(lineItemsList.size());
+		final ReferenceDataMap referenceDataMap = proposalSOSService.getReferenceDataMapFromLineItemList(lineItemsList);
+		final Map<Long, Product> productMap = referenceDataMap.getProductMap();
+		final Map<Long, SalesTarget> salesTargetMap = referenceDataMap.getSalesTargetMap();
+		for (LineItem lineItem : lineItemsList) {
+			final LineItemForm lineItemForm = new LineItemForm();
+			lineItemForm.populateForm(lineItem);
+
+			if (!productMap.containsKey(lineItem.getSosProductId()) || !Constants.ACTIVE_STATUS.equalsIgnoreCase(productMap.get(lineItem.getSosProductId()).getStatus())
+					|| productMap.get(lineItem.getSosProductId()).getDeleteDate() != null) {
+				lineItemForm.setProduct_active(Constants.NO);
+			}
+			// Setting status of sales target
+			if (!proposalHelper.getSalesTargetStatusFromSalesTargetAssocList(salesTargetMap, lineItem)) {
+				lineItemForm.setSalesTarget_active(Constants.NO);
+			}
+			lineItemsFormList.add(lineItemForm);
+		}
+		return lineItemsFormList;
+	}
+
+	/**
+	 * Saves LineItem {@link LineItem} from the package screen
+	 * @param response
+	 * @param 	lineItemsForm
+	 * 			{@link LineItemForm} has all the information related to LineItem to be saved
+	 * @return
+	 * 		Returns the Ajax response
+	 */
+	@ResponseBody
+	@RequestMapping("/saveLineItems")
+	public AjaxFormSubmitResponse saveLineItems(final HttpServletResponse response, final LineItemForm lineItemsForm) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Saving line items with lineItem id: " + lineItemsForm.getLineItemID());
+		}
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		if(StringUtils.isNotBlank(lineItemsForm.getSosProductId())){
+			lineItemsForm.setAvailSystemId(productService.getProductById(NumberUtil.longValue(lineItemsForm.getSosProductId())).getAvailsSytemId());
+		}
+		final CustomBindingResult results = new CustomBindingResult("lineItemForm", lineItemsForm);
+		new PackageLineItemsFormValidator().validate(lineItemsForm, results);
+		if(lineItemsForm.getProductType().equals(LineItemProductTypeEnum.EMAIL.getShortName())){
+			if(StringUtils.isNotBlank(lineItemsForm.getStartDate()) && !proposalHelper.isValidStartDate(lineItemsForm)){
+				results.rejectValue("startDate", ErrorCodes.LineItemEmailReservationInvalidDate, "startDate", new Object[] {Constants.SEND_DATE},
+						UserHelpCodes.LineItemsendDateHelp);
+			}
+		}
+		if (results.hasErrors()) {
+			return constructResponse(response, ajaxResponse, results);
+		} else {
+			Package adPackage = new Package();
+			if (lineItemsForm.getPackageId() != null) {
+				adPackage = packageService.getPackageById(Long.valueOf(lineItemsForm.getPackageId()));
+			}
+
+			final LineItem lineItem = new LineItem();
+			lineItem.setPackageObj(adPackage);
+			lineItemsForm.populate(lineItem);
+			lineItemsForm.populateSalestargetAssoc(lineItem, salesTargetService.getSalesTargetListByIDs(proposalHelper.getSalesTragetIdsArray(lineItemsForm.getSosSalesTargetId())));
+			Map<String, Long> productsClassMap = proposalHelper.getProductsClassMap();
+			lineItem.setSosProductClass(productsClassMap.get(lineItemsForm.getSosProductClassName()));
+			final long returnId = packageService.saveLineItems(lineItem);
+			ajaxResponse.getObjectMap().put(Constants.GRID_KEY_COLUMN_IDENTIFIER_VALUE, returnId);
+		}
+		return ajaxResponse;
+	}
+
+	/**
+	 * Returns the next sequence No. to be generated for Line Item
+	 * @param lineItemForm
+	 * @return
+	 * 			Returns the Ajax response
+	 */
+	@ResponseBody
+	@RequestMapping("/getNextSequenceNo")
+	public AjaxFormSubmitResponse getNextSequenceNo(final LineItemForm lineItemForm) {
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		ajaxResponse.getObjectMap().put(Constants.GRID_KEY_COLUMN_IDENTIFIER_VALUE,
+				packageService.getNextSequenceNoForLineItem(Long.valueOf(lineItemForm.getPackageId())));
+		return ajaxResponse;
+	}
+
+	/**
+	 * Copy the LineItems from the same Package
+	 * @param 	lineItemIds
+	 * 			String of comma separated LineItem ids 
+	 * @return
+	 * 			Returns the Ajax response
+	 */
+	@ResponseBody
+	@RequestMapping("/copyLineItem")
+	public AjaxFormSubmitResponse copyLineItem(@RequestParam("lineItemIds") final String lineItemIds) {
+		if (LOGGER.isDebugEnabled()) {
+			LOGGER.debug("Adding copied Line Item To Package. copied LineItem Id: " + lineItemIds);
+		}
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		final List<LineItem> lineItemData = proposalService.getLineItemsOnBaseOfId(StringUtil
+						.convertStringArrayToLongArray(lineItemIds.split(ConstantStrings.COMMA)));
+		if (lineItemData != null && !lineItemData.isEmpty()) {
+			for (LineItem lineItem : lineItemData) {
+				final LineItem lineItemObj = createNewLineItemFromExisting(lineItem);
+				packageService.saveLineItems(lineItemObj);
+			}
+		}
+		return ajaxResponse;
+	}
+
+	/**
+	 * Create New Line Item Object from an Existing One also copies the Target Information
+	 * @param 	lineItem
+	 * 			{@link LineItem} has all the information to create a new LineItem
+	 * @return
+	 * 			Returns a new LineItem that has been created from the existing <code>lineItem</code>
+	 */
+	private LineItem createNewLineItemFromExisting(final LineItem lineItem) {
+		final LineItem returnLineItem = new LineItem();
+		returnLineItem.setLineItemID(0L);
+		returnLineItem.setComments(lineItem.getComments());
+		returnLineItem.setFlight(lineItem.getFlight());
+		returnLineItem.setImpressionTotal(lineItem.getImpressionTotal());
+		returnLineItem.setPriceType(lineItem.getPriceType());
+		returnLineItem.setRate(lineItem.getRate());
+		returnLineItem.setLineItemSalesTargetAssocs(lineItem.getLineItemSalesTargetAssocs());
+		returnLineItem.setSosProductId(lineItem.getSosProductId());
+		returnLineItem.setProductName(lineItem.getProductName());
+		returnLineItem.setTargetingString(lineItem.getTargetingString());
+		returnLineItem.setTotalInvestment(lineItem.getTotalInvestment());
+		returnLineItem.setSosProductClass(lineItem.getSosProductClass());
+		returnLineItem.setPackageObj(lineItem.getPackageObj());
+		returnLineItem.setAvails(lineItem.getAvails());
+		returnLineItem.setAvailsPopulatedDate(lineItem.getAvailsPopulatedDate());
+		returnLineItem.setPlacementName(lineItem.getPlacementName());
+		returnLineItem.setSov(lineItem.getSov());
+		returnLineItem.setTotalPossibleImpressions(lineItem.getTotalPossibleImpressions());
+		returnLineItem.setSpecType(lineItem.getSpecType());
+		returnLineItem.setStartDate(lineItem.getStartDate());
+		returnLineItem.setEndDate(lineItem.getEndDate());
+		returnLineItem.setOrderNumber(System.currentTimeMillis());
+		returnLineItem.setRateCardPrice(lineItem.getRateCardPrice());
+		returnLineItem.setPriceCalSummary(lineItem.getPriceCalSummary());
+		returnLineItem.setSor(lineItem.getSor());
+		returnLineItem.setProductType(lineItem.getProductType());
+		returnLineItem.setLineItemSequence(packageService.getNextSequenceNoForLineItem(lineItem.getPackageObj().getId()));
+		final Set<LineItemTarget> targetSet = lineItem.getGeoTargetSet();
+		if (targetSet != null) {
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("Copying Targets of LineItems in createNewLineItemFromExisting()");
+			}
+			final Set<LineItemTarget> targetSetNew = new LinkedHashSet<LineItemTarget>(targetSet.size());
+			for (LineItemTarget lineItemTarget : targetSet) {
+				final LineItemTarget lineItemTargetNew = new LineItemTarget();
+				lineItemTargetNew.setActive(lineItemTarget.isActive());
+				lineItemTargetNew.setProposalLineItem(returnLineItem);
+				lineItemTargetNew.setSosTarTypeElementId(lineItemTarget.getSosTarTypeElementId());
+				lineItemTargetNew.setSosTarTypeId(lineItemTarget.getSosTarTypeId());
+				lineItemTargetNew.setOperation(lineItemTarget.getOperation());
+				lineItemTargetNew.setNegation(lineItemTarget.getNegation());
+				lineItemTargetNew.setSegmentLevel(lineItemTarget.getSegmentLevel());
+				targetSetNew.add(lineItemTargetNew);
+			}
+			returnLineItem.setGeoTargetSet(targetSetNew);
+		}
+		// Creating new line item sales target association list
+		final List<LineItemSalesTargetAssoc> assocsList = lineItem.getLineItemSalesTargetAssocs();
+		if (assocsList != null) {
+			final List<LineItemSalesTargetAssoc> assocsNewList = new ArrayList<LineItemSalesTargetAssoc>(assocsList.size());
+			for (LineItemSalesTargetAssoc lineItemSalesTargetAssoc : assocsList) {
+				final LineItemSalesTargetAssoc assocNew = new LineItemSalesTargetAssoc();
+				assocNew.setSosSalesTargetId(lineItemSalesTargetAssoc.getSosSalesTargetId());
+				assocNew.setSosSalesTargetName(lineItemSalesTargetAssoc.getSosSalesTargetName());
+				assocNew.setProposalLineItem(returnLineItem);
+				assocsNewList.add(assocNew);
+			}
+			returnLineItem.setLineItemSalesTargetAssocs(assocsNewList);
+		}
+		returnLineItem.setRatex(lineItem.isRatex());
+		return returnLineItem;
+	}
+
+	/**
+	 * Calculate price for a LineItem
+	 * @param response
+	 * @param form
+	 * @param salesCategoryId
+	 * @return
+	 */
+	@ResponseBody
+	@RequestMapping("/calculatePrice")
+	public AjaxFormSubmitResponse calculateBasePrice(final HttpServletResponse response, @ModelAttribute("lineItemForm") final LineItemForm form,
+			@RequestParam(value = SALE_SCATEGORY_ID, required = false) final Long salesCategoryId) {
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		final CustomBindingResult results = new CustomBindingResult("lineItemForm", form);
+		new PackageLineItemsFormValidator().pricingCalculatorValidate(form, results);
+		Double price = null;
+		if (results.hasErrors()) {
+			return constructResponse(response, ajaxResponse, results);
+		} else {
+			final LineItem lineItem = new LineItem();
+			form.populate(lineItem);
+			form.populateSalestargetAssoc(lineItem, salesTargetService.getSalesTargetListByIDs(proposalHelper.getSalesTragetIdsArray(form.getSosSalesTargetId())));
+			if (ConstantStrings.LINE_ITEM_PRICE_TYPE_CPM.equals(lineItem.getPriceType()) 
+					|| ConstantStrings.LINE_ITEM_PRICE_TYPE_CUSTOM_UNIT.equals(lineItem.getPriceType())
+					|| ConstantStrings.LINE_ITEM_PRICE_TYPE_PRE_EMPTIBLE.equals(lineItem.getPriceType()) 
+					|| ConstantStrings.LINE_ITEM_PRICE_TYPE_ADDED_VALUE.equals(lineItem.getPriceType())) {
+				final Map<String, Object> pricingCalculatorMap = pricingCalculator.getLineItemPrice(lineItem, salesCategoryId, ConstantStrings.NET);
+				if (pricingCalculatorMap != null && !pricingCalculatorMap.isEmpty()) {
+					price = (Double) pricingCalculatorMap.get("price");
+					if (price != null && price > 0.0) {
+						boolean israteCardRounded = (Boolean) pricingCalculatorMap.get("rateCardRounded");
+						if(!israteCardRounded){
+							price = NumberUtil.getHalfCentFormatedValue(price);
+						}
+						ajaxResponse.getObjectMap().put(PRICE, NumberUtil.formatDouble(price, true));
+					} else {
+						ajaxResponse.getObjectMap().put(PRICE, price);
+					}
+					final String priceCalSummary = pricingCalculatorMap.get("calculatorStep") == null ? ConstantStrings.EMPTY_STRING : pricingCalculatorMap.get("calculatorStep").toString();
+					ajaxResponse.getObjectMap().put(PRICE_CAL_SUMMARY, priceCalSummary);
+				}
+			}
+		}
+		return ajaxResponse;
+	}
+
+	/**
+	 * Show pricing calculation step
+	 * @param priceCalSummary
+	 * @param lineItemId
+	 * @param rateCardPrice
+	 * @return
+	 */
+	@RequestMapping("/getPricingCalculationStep")
+	public ModelAndView getPricingCalculationStep(@RequestParam("priceCalSummary") String priceCalSummary, @RequestParam("lineItemId") final long lineItemId,
+			@RequestParam("rateCardPrice") final String rateCardPrice) {
+		final ModelAndView view = new ModelAndView(PRICE_CAL_SUMMARY_VIEW);
+		PricingCalculatorSummary pricingCalculatorStep = null;
+		if (StringUtils.isNotBlank(rateCardPrice) && !StringUtils.equals(rateCardPrice, ConstantStrings.NOT_DEFINED) && !StringUtils.equals(rateCardPrice, ConstantStrings.NA)) {
+			if (StringUtils.isNotBlank(priceCalSummary)) {
+				pricingCalculatorStep = convertJsonToObject(priceCalSummary);
+			} else if (lineItemId > 0) {
+				final LineItem lineItem = proposalService.getLineItemById(lineItemId);
+				if (lineItem != null) {
+					priceCalSummary = lineItem.getPriceCalSummary();
+					if (StringUtils.isNotBlank(priceCalSummary)) {
+						pricingCalculatorStep = convertJsonToObject(priceCalSummary);
+					}
+				}
+			}
+		}
+		if (pricingCalculatorStep == null) {
+			view.addObject("showMsg", "stepNotFound");
+		} else {
+			view.addObject("calculatorSummary", pricingCalculatorStep);
+			view.addObject("agencyMargin", ConstantStrings.NA);
+		}
+		return view;
+	}
+
+	/**
+	 * Set json data into PricingCalculatorSummary
+	 * @param jsonString
+	 * @return
+	 */
+	private PricingCalculatorSummary convertJsonToObject(final String jsonString) {
+		final PricingCalculatorSummary pricingStep = getNode(jsonString);
+		if (pricingStep != null) {
+			/*if (pricingStep.getBasePrice() != null && pricingStep.getBasePrice() >= 0.0) {
+				pricingStep.setPrice(NumberUtil.formatDouble(NumberUtil.getHalfCentFormatedValue(pricingStep.getBasePrice()), true));
+				pricingStep.setAppliedFiveCentsRule(ConstantStrings.YES);
+			}*/
+			if (StringUtils.isNotBlank(pricingStep.getWeightedBasePrice())) {
+				pricingStep.setWeightedBasePrice(NumberUtil.formatDouble(Double.valueOf(pricingStep.getWeightedBasePrice()), true));
+			}
+			setRateProfileSummary(pricingStep);
+		}
+		return pricingStep;
+	}
+
+	/**
+	 * Set rate profile summary data
+	 * @param rateProfileJSON
+	 * @return
+	 */
+	private void setRateProfileSummary(final PricingCalculatorSummary pricingCalculatorStep) {
+		final List<RateProfileSummary> rateProfileSummary = pricingCalculatorStep.getRateProfileSummary();
+		for (RateProfileSummary rateProfile : rateProfileSummary) {
+			if (StringUtils.isNotBlank(rateProfile.getBasePrice())) {// For old line item when discount functionality is not available
+				rateProfile.setDefaultBasePrice(getFormatedValue(ConstantStrings.EMPTY_STRING));
+				rateProfile.setDefaultDiscount(getFormatedValue(ConstantStrings.EMPTY_STRING));
+				rateProfile.setDefaultdiscountBP(getFormatedValue(ConstantStrings.EMPTY_STRING));
+				rateProfile.setSalesCategoryBasePrice(getFormatedValue(ConstantStrings.EMPTY_STRING));
+				rateProfile.setSalesCategoryDiscount(getFormatedValue(ConstantStrings.EMPTY_STRING));
+				rateProfile.setSalesCategorydiscountBP(getFormatedValue(rateProfile.getBasePrice()));
+			} else {
+				rateProfile.setDefaultBasePrice(getFormatedValue(rateProfile.getDefaultBasePrice()));
+				rateProfile.setDefaultDiscount(getFormatedValue(rateProfile.getDefaultDiscount()));
+				rateProfile.setDefaultdiscountBP(getFormatedValue(rateProfile.getDefaultdiscountBP()));
+				rateProfile.setSalesCategoryBasePrice(getFormatedValue(rateProfile.getSalesCategoryBasePrice()));
+				rateProfile.setSalesCategoryDiscount(getFormatedValue(rateProfile.getSalesCategoryDiscount()));
+				rateProfile.setSalesCategorydiscountBP(rateProfile.getSalesCategorydiscountBP());
+			}
+		}
+	}
+
+	/**
+	 * @param value
+	 * @return
+	 */
+	private String getFormatedValue(final String value) {
+		String formatedValue = ConstantStrings.NA;
+		if (StringUtils.isNotBlank(value)) {
+			formatedValue = NumberUtil.formatDouble(Double.valueOf(value), true);
+		}
+		return formatedValue;
+	}
+
+	/**
+	 * Set data in 'PricingCalculatorSummary' form json string
+	 * @param json
+	 * @return
+	 */
+	private PricingCalculatorSummary getNode(final String json) {
+		PricingCalculatorSummary pricingummary = null;
+		try {
+			if (StringUtils.isNotBlank(json)) {
+				pricingummary = new ObjectMapper().readValue(json, PricingCalculatorSummary.class);
+			}
+		} catch (JsonProcessingException e) {
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("Error while parsing jsonString of pricing calculation step summary");
+			}
+		} catch (IOException e) {
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.debug("Error while parsing jsonString of pricing calculation step summary");
+			}
+		}
+		return pricingummary;
+	}
+
+	/**
+	 * Method returns the whole data for LineItem
+	 * @param lineItemId
+	 * @param productId
+	 * @return
+	 */
+	@ResponseBody
+	@RequestMapping("/getLineItemsConsolidatedData")
+	public AjaxFormSubmitResponse getLineItemsConsolidatedData(@RequestParam("lineItemId") final Long lineItemId, @RequestParam("productID") final Long productId) {
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		final LineItemForm lineItemForm = new LineItemForm();
+		lineItemForm.populateForm(proposalService.getLineItemById(lineItemId));
+		ajaxResponse.getObjectMap().put("lineItemDetailData", lineItemForm);
+		final Map<Object, Object> salesTargetProductMap = getSalesTargetFromProductID(productId);
+		ajaxResponse.getObjectMap().put("productSaleTargets", salesTargetProductMap.get("productSaleTargets"));
+		if (salesTargetProductMap.containsKey(CHILD_SALE_TARGET_IDS)) {
+			ajaxResponse.getObjectMap().put(CHILD_SALE_TARGET_IDS, salesTargetProductMap.get(CHILD_SALE_TARGET_IDS));
+		}
+		ajaxResponse.getObjectMap().put("lineItemTargets", getLineItemTarget(lineItemId));
+		ajaxResponse.getObjectMap().put("lineItemPricingSteps", getPricingCalculationJsonVal(lineItemId));
+		return ajaxResponse;
+	}
+
+	/**
+	 * @param productID
+	 * @return
+	 */
+	private Map<Object, Object> getSalesTargetFromProductID(final Long productID) {
+		final Map<Object, Object> returnMap = new HashMap<Object, Object>();
+		final Map<Long, String> allSalesTarTypMap = proposalHelper.getAllSalesTargetForProductID(productID);
+		returnMap.put("productSaleTargets", allSalesTarTypMap);
+		final Set<Long> sosSaleTarIdKey = allSalesTarTypMap.keySet();
+		final List<Long> saleTargetTypeLst = new ArrayList<Long>();
+		for (Long targetTypeId : sosSaleTarIdKey) {
+			saleTargetTypeLst.add(Long.valueOf(targetTypeId));
+		}
+		if (allSalesTarTypMap != null && !allSalesTarTypMap.isEmpty()) {
+			final Map<Long, Long> childSaleTargtLst = proposalHelper.getParentSalesTargetId(saleTargetTypeLst);
+			returnMap.put(CHILD_SALE_TARGET_IDS, childSaleTargtLst);
+		}
+		return returnMap;
+	}
+
+	/**
+	 * @param lineItemId
+	 * @return
+	 */
+	private String getLineItemTarget(final Long lineItemId) {
+		LOGGER.info("Getting Line Item Targets for LineItemID: " + lineItemId);
+		final List<LineItemTarget> geoTargetLst = proposalService.getProposalGeoTargets(lineItemId);
+		return targetJsonConverter.convertObjectToJson(geoTargetLst);
+	}
+
+	/**
+	 * Get pricing calculation json string when select grid row
+	 * @param lineItemId
+	 * @return
+	 */
+	private String getPricingCalculationJsonVal(final long lineItemId) {
+		String priceCalSummary = ConstantStrings.EMPTY_STRING;
+		if (lineItemId > 0) {
+			final LineItem lineItem = packageService.getLineItemById(lineItemId);
+			if (lineItem != null) {
+				if (StringUtils.isNotBlank(lineItem.getPriceCalSummary()) && (ConstantStrings.LINE_ITEM_PRICE_TYPE_CPM.equals(lineItem.getPriceType()) 
+								|| ConstantStrings.LINE_ITEM_PRICE_TYPE_CUSTOM_UNIT.equals(lineItem.getPriceType()) 
+								|| ConstantStrings.LINE_ITEM_PRICE_TYPE_PRE_EMPTIBLE.equals(lineItem.getPriceType())) && lineItem.getRateCardPrice() > 0) {
+					priceCalSummary = lineItem.getPriceCalSummary();
+				}
+			}
+		}
+		return priceCalSummary;
+	}
+
+	/**
+	 * Returns ajax response having the array of spec types for a particular product
+	 * @param 	productId
+	 * 			This is the id of the product for which we've to find the array of all the spec types
+	 * @return
+	 * 			 Returns ajax response
+	 */
+	@ResponseBody
+	@RequestMapping("/getProductCreativesSpecTypeLst")
+	public AjaxFormSubmitResponse getProductCreativesSpecTypeLst(@RequestParam(required = true) final long productId){
+		final AjaxFormSubmitResponse ajaxResponse = new AjaxFormSubmitResponse(getMessageSource());
+		List<ProductCreativeAssoc> productCreativesLst = productService.getProductCreatives(productId);
+		String[] productCreativeSpecTypeArr = new String[productCreativesLst.size()];
+		int index = 0;
+		for (ProductCreativeAssoc productCreativeAssoc : productCreativesLst) {
+			productCreativeSpecTypeArr[index] = productCreativeAssoc.getCreative().getType();
+			index++;
+		}
+		ajaxResponse.getObjectMap().put(Constants.GRID_KEY_COLUMN_IDENTIFIER_VALUE, productCreativeSpecTypeArr);
+		return ajaxResponse;
+	}
+	
+	public void setPackageService(final IPackageService packageService) {
+		this.packageService = packageService;
+	}
+
+	public void setProposalHelper(final ProposalHelper proposalHelper) {
+		this.proposalHelper = proposalHelper;
+	}
+
+	public void setProposalService(final IProposalService proposalService) {
+		this.proposalService = proposalService;
+	}
+
+	public void setProposalSOSService(final IProposalSOSService proposalSOSService) {
+		this.proposalSOSService = proposalSOSService;
+	}
+
+	public void setTargetJsonConverter(final TargetJsonConverter targetJsonConverter) {
+		this.targetJsonConverter = targetJsonConverter;
+	}
+
+	public void setPricingCalculator(final IPricingCalculator pricingCalculator) {
+		this.pricingCalculator = pricingCalculator;
+	}
+
+	public void setSalesTargetService(final ISalesTargetService salesTargetService) {
+		this.salesTargetService = salesTargetService;
+	}
+
+	public void setProductService(IProductService productService) {
+		this.productService = productService;
+	}
+}

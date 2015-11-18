@@ -1,0 +1,14 @@
+################## Data Base Connection Settings ##################
+driverClassName=oracle.jdbc.driver.OracleDriver
+
+
+
+############################### Data Association Validator ###############
+attribute_creative=SELECT count(*) AS COUNT FROM {h-schema}MP_CREATIVE_ATTRIBUTE_ASSOC WHERE ATTRIBUTE_ID = ?
+attribute_product=SELECT count(*) AS COUNT FROM {h-schema}MP_PRODUCT_ATTRIBUTE_ASSOC WHERE ATTRIBUTE_ID = ?
+creative_product=SELECT count(*) AS COUNT FROM {h-schema}MP_PRODUCT_CREATIVE_ASSOC WHERE CREATIVE_ID = ?
+proposal_assigneduser=SELECT count(*) AS COUNT FROM {h-schema}MP_Proposals WHERE IS_ACTIVE = '1' AND ASSIGN_TO_USER = ?
+
+######## For Validating the DB Connection##########################
+validate_query=SELECT 1 FROM DUAL
+evictor_run_interval_millis=60000

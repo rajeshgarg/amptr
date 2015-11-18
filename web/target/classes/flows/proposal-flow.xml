@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<flow xmlns="http://www.springframework.org/schema/webflow"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/webflow
+                          http://www.springframework.org/schema/webflow/spring-webflow-2.0.xsd">
+   
+    
+   	<input name="proposalId" type="long" required="false" />
+  	
+  	<!--  Can pass flow variable to any method for initialisation :  -->
+  	<on-start>
+		<evaluate expression="workflowHandler.initProposal(proposalId, flowRequestContext)" result="flowScope.proposalForm" />
+	</on-start>	 
+ 
+ 	<!-- Initial decision state : To Create New or edit a proposal -->
+  	<decision-state id="workOnProposal">
+    	<if test="proposalId != null and proposalId != 0" then="openProposal" else="newProposal" />
+	</decision-state>
+	
+	<view-state id="errorHandling" view="workflowError">
+	</view-state>
+	
+	<!--  New proposal creation screen -->
+	<view-state id="newProposal" view="proposal" model="proposalForm">
+		<on-render>
+			<evaluate expression="workflowHandler.setupForm" />
+			<evaluate expression="workflowHandler.setupDropdownValues" />
+			<evaluate expression="workflowHandler.setupNewProposalData" />
+			<set name="viewScope.assignedToCurrentUser" value="true" />
+			<!--<set name="viewScope.readOnlyView" value="true" /> -->
+		</on-render>
+		<transition on="eventViewEditBasicInfo" to="basicInfo">
+			<evaluate expression="workflowHandler.updateProposalId(flowRequestContext)" />
+		</transition>
+	</view-state>
+	
+	<!-- Open proposal (Basic Info screen) -->
+	<view-state id="openProposal" view="proposal" model="proposalForm">
+		<on-render>
+    		<evaluate expression="workflowHandler.setupForm" />
+    		<evaluate expression="workflowHandler.setupDropdownValues" />
+			<evaluate expression="workflowHandler.setupProposalData"/>
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render>
+
+		<!-- Proposal Reservation screen -->
+		<transition on="eventProposalReservation" to="proposalReservation">
+			<evaluate expression="workflowHandler.setupForm"></evaluate>
+		</transition>
+		
+		<!-- Display Proposal option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+		
+		<!-- Display basic info screen when proposal assignment is changed-->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+		
+	</view-state>
+	
+	<!-- Basic Info screen -->
+	<view-state id="basicInfo" view="basicInfo" model="proposalForm">
+		<on-render>
+    		<evaluate expression="workflowHandler.setupDropdownValues" />
+			<evaluate expression="workflowHandler.setupProposalData"/>
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render>
+
+		<!-- Proposal Reservation screen -->
+		<transition on="eventProposalReservation" to="proposalReservation">
+			<evaluate expression="workflowHandler.setupForm"></evaluate>
+		</transition>
+		
+		<!-- Display Proposal option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+		
+		<!-- Display basic info screen when proposal assignment is changed-->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+	</view-state>
+	
+	<!--  Proposal Reservation -->
+	<view-state id="proposalReservation" view="proposalReservation" model="proposalForm">
+		<on-render>
+			<evaluate expression="workflowHandler.setupProposalData" />
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render>
+		
+		<!-- Back to Basic Information screen -->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+		
+		<!-- Display option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+	</view-state> 
+    	
+	<!-- Build Proposal Screen -->
+	<view-state id="buildProposal" view="buildProposal" model="proposalForm">
+		<on-render>
+			<evaluate expression="workflowHandler.setupProposalData"/>
+			<evaluate expression="workflowHandler.setupOptionVersionData" />
+			<evaluate expression="workflowHandler.setupSearchData" />
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isLatestOptionVersion(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isOptionUnderReview(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render>
+				
+		<!-- Back to Basic Information screen -->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+		
+		<!-- Back to Basic Information screen -->
+		<transition on="eventProposalReservation" to="proposalReservation"></transition>
+		
+		<!-- Display other option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+		
+		<!-- Generate Media Template, User can navigate to generate media template screen -->
+		<transition on="eventGenerateMediaTemplate" to="generateMediaTemplate"></transition>
+		
+			<!-- Display older version data in buildProposal screen -->
+		<transition on="eventShowPreviousVersionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionVersion(flowRequestContext)" />
+		</transition>
+	
+		<!-- Summary screen, From Setup screen user can moved to Summary screen after save -->
+		<transition on="eventShowSummary" to="summaryProposal"></transition>
+		
+		<!-- Used in case of create New Version -->
+		<transition on="eventCreateNewVersion" to="buildProposal">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+		<transition on="eventCreateNewVersionBasic" to="basicInfo">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+	</view-state>
+	
+   	<!-- Generate Media Template -->
+    <view-state id="generateMediaTemplate" view="proposalTemplate" model="proposalForm">
+    	<on-render>
+    		<evaluate expression="workflowHandler.setupTemplateData" />
+    		<evaluate expression="workflowHandler.setupProposalData" />
+    		<evaluate expression="workflowHandler.setupOptionVersionData" />
+			<evaluate expression="workflowHandler.isProposalCompletedAndAssigned(flowRequestContext)" result="viewScope.isCompletedAndAssigned" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isLatestOptionVersion(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isOptionUnderReview(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render> 	
+		
+		<!-- Back to Basic Information screen -->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+		
+		<!-- Back to Proposal Reservation screen -->
+		<transition on="eventProposalReservation" to="proposalReservation"></transition>
+		
+		<!-- Display other option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+		
+		<!-- User can navigate to build proposal screen -->
+		<transition on="eventBuildProposal" to="buildProposal"></transition>
+	
+		<!-- Summary screen, user can moved to Summary screen -->
+		<transition on="eventShowSummary" to="summaryProposal"></transition>
+		
+		<!-- Used in case of create New Version -->
+		<transition on="eventCreateNewVersion" to="generateMediaTemplate">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+		<transition on="eventCreateNewVersionBasic" to="basicInfo">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+		<!-- Display older version data in generate Template screen -->
+		<transition on="eventShowPreviousVersionData" to="generateMediaTemplate">
+			<evaluate expression="workflowHandler.updateOptionVersion(flowRequestContext)" />
+		</transition>
+		
+	</view-state>
+		
+	<!-- Summary Screen -->
+	<view-state id="summaryProposal" view="summaryProposal" model="proposalForm">
+		<on-render>
+			<evaluate expression="workflowHandler.setupProposalData" />
+			<evaluate expression="workflowHandler.setupOptionVersionData" />
+			<evaluate expression="workflowHandler.setupSummaryData" />
+			<evaluate expression="workflowHandler.readOnlyView(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isLatestOptionVersion(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+			<evaluate expression="workflowHandler.isOptionUnderReview(flowRequestContext)" result="viewScope.readOnlyView" result-type="java.lang.Boolean"/>
+		</on-render>
+		
+		<!-- Move to basic information screen -->
+		<transition on="eventViewEditBasicInfo" to="basicInfo"></transition>
+		
+		<!-- Back to Proposal Reservation screen -->
+		<transition on="eventProposalReservation" to="proposalReservation"></transition>
+		
+		<!-- Display other option data in summary screen -->
+		<transition on="eventShowProposalOptionData" to="buildProposal">
+			<evaluate expression="workflowHandler.updateOptionId(flowRequestContext)" />
+		</transition>
+		
+		<!-- Generate Media Template, User can navigate to generate media template screen -->
+		<transition on="eventGenerateMediaTemplate" to="generateMediaTemplate"></transition>
+		
+		<!-- Build Proposal screen -->
+		<transition on="eventBuildProposal" to="buildProposal"></transition>
+		
+		<!-- Used in case of create New Version -->
+		<transition on="eventCreateNewVersion" to="summaryProposal">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+		<transition on="eventCreateNewVersionBasic" to="basicInfo">
+			<evaluate expression="workflowHandler.resetOptionVersion(flowRequestContext)" />
+		</transition>
+		
+		<!-- Display older version data in summary screen -->
+		<transition on="eventShowPreviousVersionData" to="summaryProposal">
+			<evaluate expression="workflowHandler.updateOptionVersion(flowRequestContext)" />
+		</transition>		
+	</view-state>  
+	
+	<global-transitions>
+    	<transition on-exception="java.lang.Exception" to="errorHandling"/>
+	</global-transitions>
+</flow>

@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:mvc="http://www.springframework.org/schema/mvc" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd">
+
+	<import resource="spring-webflow-config.xml" />
+		
+	<bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations">
+			<list>
+				<value>classpath:config.properties</value>
+				<value>file:E:/NYT/AMPT/properties_files/amptServiceConfig.properties</value>
+				<value>file:E:/NYT/AMPT/properties_files/envConfig.properties</value>
+			</list>
+		</property>
+	</bean>
+	
+	<mvc:annotation-driven/>
+	
+	<bean abstract="true" id="baseController" class="com.nyt.mpt.controller.AbstractBaseController">	
+		<property name="messageSource"><ref local="messageSource" /></property>
+	</bean>
+	
+	<bean id="manageCreativeController" class="com.nyt.mpt.controller.ManageCreativeController" parent="baseController">	
+		<property name="creativeService"><ref parent="creativeService" /></property>	
+		<property name="attributeService"><ref parent="attributeService" /></property>
+		<property name="documentService"><ref parent="documentService" /></property>	
+	</bean>
+	
+	<bean id="manageAttributeController" class="com.nyt.mpt.controller.ManageAttributeController" parent="baseController">			
+		<property name="attributeService"><ref parent="attributeService"/></property>	
+		<property name="creativeService"><ref parent="creativeService" /></property>
+		<property name="adProductService"><ref parent="productService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="templateService"><ref parent="templateService" /></property>
+	</bean>
+	
+	<bean id="manageProductController" class="com.nyt.mpt.controller.ManageProductController" parent="baseController">			
+		<property name="adCreativeService"><ref parent="creativeService" /></property>	
+		<property name="attributeService"><ref parent="attributeService" /></property>
+		<property name="documentService"><ref parent="documentService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="adProductService"><ref parent="productService" /></property>
+	</bean>
+	
+	<!-- propertyFileList is been used for loading the key value pair from below listed property files to JS Files  -->
+	<bean id="homePageController" class="com.nyt.mpt.controller.HomePageController">
+		<property name="messageSource"><ref local="messageSource" /></property>
+		<property name="databaseHeartBeatService"><ref parent="databaseHeartBeatService" /></property>
+	</bean>
+	
+	<bean id="documentController" class="com.nyt.mpt.controller.DocumentController" parent="baseController">
+		<property name="documentHelper"><ref local="documentHelper"></ref></property>
+	</bean>
+	
+	<bean id="documentHelper" class="com.nyt.mpt.util.DocumentHelper">
+		<property name="docUtil"><ref parent="docUtil"/></property>
+		<property name="documentService"><ref parent="documentService" /></property>
+	</bean>
+	
+  	<bean id="manageUsersController" class="com.nyt.mpt.controller.ManageUsersController" parent="baseController">	
+		<property name="userService"><ref parent="userService" /></property>
+		<property name="sosService"><ref parent="sosService" /></property>
+		<property name="defaultUserAddress">
+			<props>
+				<prop key="address1">${address1}</prop>
+				<prop key="address2">${address2}</prop>
+				<prop key="state">${state}</prop>
+				<prop key="city">${city}</prop>
+				<prop key="zip">${zip}</prop>
+			</props>
+		</property>
+	</bean>
+   
+	<bean id="packageController" class="com.nyt.mpt.controller.ManagePackageController" parent="baseController">
+		<property name="packageService"><ref parent="packageService" /></property>
+		<property name="userService"><ref parent="userService" /></property>
+		<property name="documentService"><ref parent="documentService" /></property>
+		<property name="adProductService"><ref parent="productService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="proposalWorkFlowHandler"><ref local="workflowHandler" /></property>
+	</bean>
+	
+	<bean id="packageLineItemsController" class="com.nyt.mpt.controller.PackageLineItemsController" parent="baseController">
+		<property name="packageService"><ref parent="packageService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="proposalSOSService"><ref parent="proposalSOSService" /></property>
+		<property name="targetJsonConverter"><ref local="targetJsonConverter" /></property>
+		<property name="pricingCalculator"><ref parent="pricingCalculator" /></property>
+		<property name="salesTargetService"><ref parent="salesTargetService" /></property>
+		<property name="productService"><ref parent="productService" /></property>
+	</bean>
+	
+	<bean id="listRateController" class="com.nyt.mpt.controller.ManageRateProfileController" parent="baseController">	
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="rateProfileService"><ref parent="rateProfileService"/></property>	
+		<property name="salesTargetService"><ref parent="salesTargetService"/></property>
+		<property name="cronJobService"><ref parent="cronService" /></property>
+	</bean>
+	
+	<bean id="viewResolver" class="org.springframework.web.servlet.view.ResourceBundleViewResolver">
+		<property name="basename" value="views" />
+	</bean>
+	
+	<bean id="jacksonMessageConverter" class="org.springframework.http.converter.json.MappingJacksonHttpMessageConverter" />
+	
+  	<!-- Saves a locale change using a cookie -->
+	<bean id="localeResolver" class="org.springframework.web.servlet.i18n.CookieLocaleResolver" />
+
+	<!-- Application Message Bundle -->
+	<bean id="messageSource" class="com.nyt.mpt.util.NYTReloadableResourceBundleMessageSource">
+		<property name="basename" value="classpath:messages" />
+	</bean>
+
+	<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver"/>
+	
+	<bean id="workflowHandler" class="com.nyt.mpt.util.ProposalWorkflowHandler">
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="userService"><ref parent="userService" /></property>
+		<property name="proposalSOSService"><ref parent="proposalSOSService" /></property>
+		<property name="sosURL" value="${sos.url}"></property>
+	</bean>
+	
+	<bean id="manageProposalController" class="com.nyt.mpt.controller.ManageProposalController" parent="baseController">
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="packageService"><ref parent="packageService" /></property>
+		<property name="templateService"><ref parent="templateService" /></property>
+		<property name="templateGenerator"><ref local="templateGenerator" /></property>
+		<property name="proposalSOSService"><ref parent="proposalSOSService" /></property>
+	</bean>
+	
+	<bean id="proposalWorkflowController" class="com.nyt.mpt.controller.ProposalWorkflowController" parent="baseController">
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="targetJsonConverter"><ref local="targetJsonConverter" /></property>
+		<property name="proposalSOSService"><ref parent="proposalSOSService" /></property>
+		<property name="packageService"><ref parent="packageService" /></property>		
+		<property name="pricingCalculator"><ref parent="pricingCalculator" /></property>
+		<property name="auditService"><ref parent="auditService"/></property>
+		<property name="userService"><ref parent="userService"/></property>
+		<property name="mailUtil"><ref parent="mailUtil"/></property>
+		<property name="sosIntegrationService"><ref parent="sosIntegrationService"/></property>
+		<property name="salesTargetService"><ref parent="salesTargetService" /></property>
+		<property name="productService"><ref parent="productService" /></property>
+		<property name="templateService"><ref parent="templateService" /></property>
+		<property name="templateGenerator"><ref local="templateGenerator" /></property>
+		<property name="pricingStatusCalculatorService"><ref parent="pricingStatusCalculatorService" /></property>
+		<property name="lineItemUtil"><ref local="lineItemUtil" /></property>
+		<property name="emailFrom" value="${calendar.reservation.job.email.from}"></property>
+		<property name="emailScheduleService"><ref parent="emailScheduleService" /></property>
+		<property name="reservationService"><ref parent="reservationService" /></property>
+		<property name="salesForceProposalService"><ref parent="salesForceProposalService" /></property>
+		<property name="proposalUtilService"><ref parent="proposalUtilService" /></property>
+	</bean>
+	
+	<bean id="templateGenerator" class="com.nyt.mpt.util.TemplateGenerator">
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="templateService"><ref parent="templateService" /></property>
+		<property name="templatesSource" value="${templates.location}"></property>
+		<property name="productService"><ref parent="productService" /></property>
+	</bean>
+	
+	<bean id="proposalHelper" class="com.nyt.mpt.util.ProposalHelper">
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="userService"><ref parent="userService" /></property>
+		<property name="productService"><ref parent="productService" /></property>
+		<property name="sosService"><ref parent="sosService" /></property>
+		<property name="templateService"><ref parent="templateService" /></property>
+		<property name="adProductService"><ref parent="productService" /></property>
+		<property name="salesTargetService"><ref parent="salesTargetService" /></property>
+		<property name="proposalSOSService"><ref parent="proposalSOSService" /></property>
+		<property name="targetingService"><ref parent="targetingService" /></property>
+		<property name="mailUtil"><ref parent="mailUtil"/></property>
+		<property name="applicationURL" value="${application.url}"></property>
+		<property name="emailScheduleService"><ref parent="emailScheduleService" /></property>
+	</bean>
+	
+	<bean id="welcomeStringComponentHandler" class="com.nyt.mpt.component.WelcomeStringComponentHandler">
+		<property name="messageSource"><ref local="messageSource" /></property>
+	</bean>
+	
+	<bean id="dashboardController" class="com.nyt.mpt.controller.DashboardController">
+		<property name="dashboardService"><ref parent="dashboardService" /></property>
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="userService"><ref parent="userService" /></property>
+	</bean>	
+	
+	<bean id="lineItemUtil" class="com.nyt.mpt.util.LineItemUtil">		
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>		
+	</bean>	
+			
+	<bean id="targetJsonConverter" class="com.nyt.mpt.util.TargetJsonConverter">
+		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+		<property name="lineItemUtil"><ref local="lineItemUtil" /></property>
+	</bean>
+	
+	<bean id="templateManagementController" class="com.nyt.mpt.controller.ManageTemplateController" parent="baseController">
+	 	<property name="templateService"><ref parent="templateService" /></property>
+		<property name="templateGenerator"><ref local="templateGenerator" /></property>	
+ 	</bean>
+ 	
+ 	<bean id="manageTierController" class="com.nyt.mpt.controller.ManageTierController" parent="baseController">
+ 		<property name="salesTargetService"><ref parent="salesTargetService" /></property>
+ 		<property name="tierService"><ref parent="tierService" /></property>
+ 		<property name="targetingService"><ref parent="targetingService" /></property>
+ 	</bean>
+ 	
+ 	<bean id="reservationController" class="com.nyt.mpt.controller.ReservationController" parent="baseController">
+ 		<property name="helper"><ref local="proposalHelper" /></property> 
+ 		<property name="productService"><ref parent="productService" /></property>
+ 		<property name="targetingService"><ref parent="targetingService" /></property>
+ 		<property name="reservationService"><ref parent="reservationService" /></property>
+ 		<property name="salesTargetService"><ref parent="salesTargetService" /></property>
+		<property name="sosURL" value="${sos.url}"></property>
+ 	</bean>
+ 	<bean id="manageReservationController" class="com.nyt.mpt.controller.ManageReservationController" parent="baseController">
+ 		<property name="reservationService"><ref parent="reservationService" /></property>
+ 		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+ 		<property name="productService"><ref parent="productService" /></property>
+ 		<property name="targetJsonConverter"><ref local="targetJsonConverter" /></property>
+ 		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="sosURL" value="${sos.url}"></property>
+		<property name="userService"><ref parent="userService" /></property>
+		<property name="multipleCalendarService"><ref parent="multipleCalendarService" /></property>
+		<property name="proposalUtilService"><ref parent="proposalUtilService" /></property>
+ 	</bean>
+ 	
+ 	<bean id="manageAddedValueController" class="com.nyt.mpt.controller.ManageAddedValueController" parent="baseController">
+ 		<property name="addedValueService"><ref parent="addedValueService" /></property>
+ 	</bean>
+ 	
+ 	<bean id="availsController" class="com.nyt.mpt.controller.AvailsController" parent="baseController">
+ 		<property name="proposalHelper"><ref local="proposalHelper" /></property>
+ 		<property name="yieldexService"><ref parent="yieldexService" /></property>
+		<property name="yieldexHelper"><ref parent="yieldexHelper" /></property>
+		<property name="proposalService"><ref parent="proposalService" /></property>
+		<property name="packageService"><ref parent="packageService" /></property>
+		<property name="dfpGateway"><ref local="dfpGateway" /></property>
+ 	</bean>
+ 	
+ 	<bean id="emailScheduleController" class="com.nyt.mpt.controller.ManageEmailScheduleController" parent="baseController">
+ 		<property name="emailScheduleService"><ref parent="emailScheduleService"/></property>
+		<property name="productService"><ref parent="productService" /></property>
+	</bean>
+	
+	<bean id="dfpGateway" class="com.nyt.mpt.util.DfpGateway">
+		<property name="dfpURL" value="${dfp.wrapper.url}"></property>
+		<property name="dfpUsername" value="${dfp.wrapper.username}"></property>
+		<property name="dfpPassword" value="${dfp.wrapper.password}"></property>
+	</bean>
+</beans>

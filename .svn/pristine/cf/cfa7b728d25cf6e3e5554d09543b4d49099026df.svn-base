@@ -1,0 +1,380 @@
+/**
+ * @author rakesh.tewari
+ */
+$(document).ready(function () {
+  	/**
+	 * Grid For Proposal Line Items
+	 */
+    var proposalLineItemsGridOpte = new proposalJqGridBaseOptions(); 
+    proposalLineItemsGridOpte.url = "./proposalWorkflow/getAllReservedLineItemsForProposal.action?proposalId="+jQuery("#proposalID","#reservationParentDiv").val();
+    proposalLineItemsGridOpte.colNames = [
+		'ID','sosProductId','Product','Sales Target','sosSalesTargetId','Targeting String','Start Date','End Date','SOR', 'Option', 'optionID', 'Creation Date', 'Expiry Date', 'Last Renewed On','reserved', 'lineItemTargetingData', 'productActive', 'salesTargetActive', 'Product Class Name', 'Action'
+    ];
+    proposalLineItemsGridOpte.colModel = [
+		{name:"lineItemID", index:"lineItemID", align:"right", key:true, width:30,align:"center"},
+		{name:"sosProductId",index:"sosProductId",hidden:true,width:0},			
+		{name:"productName",index:"productName",width:70},
+		{name:"sosSalesTargetName",index:"sosSalesTargetName",width:60},
+		{name:"sosSalesTargetId",index:"sosSalesTargetId",hidden:true},
+		{name:"targetingString",index:"targetingString",sortable:false,width:100},
+		{name:"startDate",index:"startDate",align:"center",width:55},
+		{name:"endDate",index:"endDate",align:"center",width:55},
+		{name:"sor",index:"sor",align:"center", align:"right",width:35},
+		{name:"optionName",index:"optionName",sortable:false,width:40},
+		{name:"optionId",index:"optionId",sortable:false,hidden:true},
+		{name:"reservationCreationDate",index:"reservationCreationDate",align:"center",width:60},		
+		{name:"reservationExpiryDate",index:"reservationExpiryDate",align:"center",width:60},
+		{name:'lastRenewedOn', index:'lastRenewedOn', key:false, width:80,align:"center"},
+		{name:"reserved",index:"reserved",hidden:true},
+		{name:"lineItemTargetingData",index:"lineItemTargetingData",hidden:true},
+		{name:"product_active",index:"product_active",hidden:true},
+		{name:"salesTarget_active",index:"salesTarget_active",hidden:true},
+		{name:"sosProductClassName",index:"sosProductClassName",hidden:true,width:0},
+		{name:'act', index:'act', sortable:false, key:false, width:70,align:"center"},
+	];
+	proposalLineItemsGridOpte.height = 375;
+	proposalLineItemsGridOpte.rowNum = 15;
+	proposalLineItemsGridOpte.emptyrecords = "No records to view";
+	proposalLineItemsGridOpte.rowList = [15,20,25];
+	proposalLineItemsGridOpte.caption = resourceBundle['tab.generic.manageReservation'];
+	proposalLineItemsGridOpte.pager = jQuery('#reservedLineItemPager');
+	proposalLineItemsGridOpte.sortname = "lineItemID";
+	proposalLineItemsGridOpte.afterGridCompleteFunction = function (){
+		var lineItemIds = jQuery("#reservedLineItemTable").jqGrid('getDataIDs');
+		for(var i = 0;i < lineItemIds.length; i++){
+			var lineItemId = lineItemIds[i];
+			var endDate = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'endDate');
+			var isProductActive = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'product_active');
+			var isSalesTargetActive = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'salesTarget_active');
+			var be = "<span class='grid-action-icons'>";
+				if((($("#readOnlyView", "#reservationParentDiv").val() != "true") || ($("#proposalAssignedToCurrentUsr").val() == "true" && 
+					$("#readOnlyView", "#reservationParentDiv").val() == "true" && $("#proposalStatus", "#reservationParentDiv").val() == 'PROPOSED'))
+					&& ($("#proposalOwnerRole", "#reservationParentDiv").val() != 'SGL') && isProductActive == "Yes" && isSalesTargetActive == "Yes"){
+					if((Date.parse($("#currentDate", "#reservationParentDiv").val()) <= Date.parse(endDate)) && isProposalUnderReview(lineItemId)){ 
+						if(($("#proposalOwnerRole", "#reservationParentDiv").val() == 'ADM') || ($("#proposalOwnerRole", "#reservationParentDiv").val() == 'POW')){
+							be = be + "<a id=renewExpiryDate"+lineItemId+" onclick='renewLineItemsExpirationDate("+ lineItemId +")' title='Renew Expiration Date' style='position:absolute;margin-left:0px;'>" +
+								"<img src='images/renew_reservation.png' /></a>";
+						}else if(showHideRenewBtn(lineItemId)){
+							be = be + "<a id=renewExpiryDate"+lineItemId+" onclick='renewLineItemsExpirationDate("+ lineItemId +")' title='Renew Expiration Date' style='position:absolute;margin-left:0px;'>" +
+							"<img src='images/renew_reservation.png' /></a>";
+						}
+					}
+					if((Date.parse($("#currentDate", "#reservationParentDiv").val()) <= Date.parse(endDate))  && $("#proposalStatus", "#reservationParentDiv").val() != 'REVIEW'){
+				  		be = be + "<a onclick='moveReservedLineItemsData("+ lineItemId +")' title='Move Reservation' style='position:absolute;margin-left:20px;'>" +
+							"<img src='images/move_reservation.png' /></a>"; 
+				 	}
+				}
+				be = be + "<a onclick='viewCalendarFromGrid("+ lineItemId +")' title='View calendar' style='position:absolute;margin-left:40px;'>" +
+					"<img src='images/full_calendar_small.png'/></a>";
+				if((($("#readOnlyView", "#reservationParentDiv").val() != "true") || ($("#proposalAssignedToCurrentUsr").val() == "true" && 
+						$("#readOnlyView", "#reservationParentDiv").val() == "true" && $("#proposalStatus", "#reservationParentDiv").val() == 'INPROGRESS')) 
+						&& ($("#proposalOwnerRole", "#reservationParentDiv").val() != 'SGL') && (Date.parse($("#currentDate", "#reservationParentDiv").val()) <= Date.parse(endDate))){
+					be = be + "<a onclick='deleteReservedLineItem("+ lineItemId +")' title='Delete Reservation' style='position:absolute;margin-left:60px;'>" +
+					"<img src='images/delete.png' /> </a></span>"; 
+				}
+			jQuery('#reservedLineItemTable').jqGrid('setRowData', lineItemId, {act:be});
+			$('td[aria-describedby=reservedLineItemTable_act]').removeAttr("title");
+			var reservedStatus = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'reserved');
+            if (reservedStatus == 'false') {
+                $("#" + lineItemId, "#reservedLineItemTable").find("td").addClass("expire-package");
+            }
+		}
+	};
+	proposalLineItemsGridOpte.onSelectRow = function(id){
+		
+	};
+	jQuery("#reservedLineItemTable").jqGrid(proposalLineItemsGridOpte).navGrid('#reservedLineItemPager', {
+		edit: false, del: false, search: false, add: false
+	});
+	
+	/* Create Modal Dialog for renew expiry date */
+	var renewExpirationDateDlg = new ModalDialog();
+    renewExpirationDateDlg.height = 170;
+    renewExpirationDateDlg.width = 360;
+    renewExpirationDateDlg.resizable = false;
+    renewExpirationDateDlg.draggable = false;
+    renewExpirationDateDlg.buttons = [{
+        text: "Renew",
+        click: function(){
+			/*$(this).dialog("close");*/
+            updateExpirationDate($("#lineItemID", "#renewExpirationDateContainer").val());
+        }
+    }, {
+        text: "No",
+        click: function(){
+        	$("#renewDate", "#renewExpirationDateContainer").qtip("destroy");
+    		$("#renewDate", "#renewExpirationDateContainer").removeClass("errorElement");
+    		$("#renewDate", "#renewExpirationDateContainer").attr('title',"");
+			$("#renewDate", "#renewExpirationDateContainer").val("");
+			$("#reservationExpiryDate", "#renewExpirationDateContainer").val("");
+			$("#lineItemID", "#renewExpirationDateContainer").val("");
+            $(this).dialog("close");
+        }
+    }];
+    $("#renewExpirationDateContainer").dialog(renewExpirationDateDlg);
+    enableDialogButton("renewExpirationDateContainer");
+    $('#renewExpirationDateContainer').bind('dialogclose', function(event) {
+    	$("#renewDate", "#renewExpirationDateContainer").qtip("destroy");
+		$("#renewDate", "#renewExpirationDateContainer").removeClass("errorElement");
+		$("#renewDate", "#renewExpirationDateContainer").attr('title',"");
+	 });
+});
+
+function viewCalendarFromGrid (lineItemId) {
+	 try {
+        var myParentWindow = window.opener;
+        myParentWindow.viewCalanderWindow(getParamsStrForCalendar(lineItemId));
+    } 
+    catch (e) {
+		var width = screen.width - 150;
+		var height = screen.height - 150;
+		var win = window.open($("#contextPath").val() + "/reservations/viewCalendar.action?" + getParamsStrForCalendar(lineItemId), "ReservationCalendar", "left=50,top=0,width=" + width + ",height=" + height + ",toolbar=0,resizable=1,menubar=0,scrollbars=1,location=no");
+		win.focus();
+    }
+}
+
+function getParamsStrForCalendar(gsr){
+    var productId = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'sosProductId');
+    var salesTargetId = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'sosSalesTargetId');
+    var startDate = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'startDate');
+    var endDate = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'endDate');
+    
+    var lineItemTargetingJsonData = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'lineItemTargetingData');
+    var lineItemTargetingData = "";
+    if (lineItemTargetingJsonData) {
+        lineItemTargetingData = getTargetingJsonString(lineItemTargetingJsonData);
+    }
+    var returnParams = "productId=" + productId + "&salesTargetId=" + salesTargetId + "&startDate=" + startDate + "&endDate=" + endDate + "&proposalId=" + jQuery("#proposalID", "#reservationParentDiv").val() + "&lineItemTargetingData=" + lineItemTargetingData;
+    return returnParams;
+}
+
+function getTargetingJsonString(lineItemTargetingData){
+	var lineItemTargetings = new Array();
+	var objId ="";
+	var action = "";
+	var not = "";
+	var jsonObj = jQuery.parseJSON(lineItemTargetingData);
+	
+	var lineItemTargetingJsonData = "";
+	$.each(jsonObj, function(i, item) {
+		var object = new Object();		
+		object.action = "";
+		object.targetTypeId =  item.sosTarTypeId;
+		object.targetTypeElement = item.sosTarTypeElement		
+		object.not = "";
+		object.segmentLevel = "";
+		
+		lineItemTargetings.push(object);
+       // lineItemTargetingJsonData = JSON.stringify(lineItemTargetings);
+	});
+	
+	return JSON.stringify(lineItemTargetings);
+}
+
+
+function renewLineItemsExpirationDate(lineItemId){
+    $("#renewDate").datepicker("destroy");
+	var reservationExDate = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'reservationExpiryDate')
+    $("#reservationExpiryDate", "#renewExpirationDateContainer").val(reservationExDate);
+    $("#lineItemID", "#renewExpirationDateContainer").val(lineItemId);
+	renewExpirationDate(reservationExDate,lineItemId);
+	$("#renewExpirationDateContainer").dialog("open");
+}
+
+function renewExpirationDate(reservationExDate, lineItemId){
+    var reservation = reservationExDate.split("/");
+    var months = new Array('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12');
+
+    var reservationDate = new Date(reservation[2], reservation[0] - 1, reservation[1]);
+    var now = new Date();
+    var productClassName = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'sosProductClassName');
+	var startDate = new Date($("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'startDate'));
+	now.setDate(now.getDate() + 14);
+	var modifiedStartDate = new Date();
+	modifiedStartDate.setYear(now.getFullYear()+1);
+	if(productClassName && productClassName == 'HOME PAGE' && startDate > modifiedStartDate){
+		var date = ((modifiedStartDate.getDate() < 10) ? "0" : "") + modifiedStartDate.getDate();
+		$("#renewDate", "#renewExpirationDateContainer").val(months[modifiedStartDate.getMonth()] + "/" + date + "/" + modifiedStartDate.getFullYear());
+	}
+	else if(productClassName && productClassName != 'HOME PAGE' && startDate > now){
+		var date = ((now.getDate() < 10) ? "0" : "") + now.getDate();
+		$("#renewDate", "#renewExpirationDateContainer").val(months[now.getMonth()] + "/" + date + "/" + now.getFullYear());
+	}
+	else{
+		var date = ((startDate.getDate() < 10) ? "0" : "") + startDate.getDate();
+		$("#renewDate", "#renewExpirationDateContainer").val(months[startDate.getMonth()] + "/" + date + "/" + startDate.getFullYear());
+	}
+	if($("#proposalOwnerRole", "#reservationParentDiv").val() == 'ADM' || $("#proposalOwnerRole", "#reservationParentDiv").val() == 'POW'){
+		createAdminDatePicker();
+	}
+}
+
+function showHideRenewBtn(gsr){
+    var reservationExpiryDate = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'reservationExpiryDate');
+	if(reservationExpiryDate != ""){
+		var now = new Date();
+		var mdy = reservationExpiryDate.split('/');
+		var expiryDate = new Date(mdy[2], mdy[0]-1, mdy[1]);
+		var days = Math.ceil((expiryDate.getTime() - now.getTime())/ (24 * 3600 * 1000));
+		if (days <= 3) {
+			var productClassName = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'sosProductClassName');
+			if(($("#proposalOwnerRole", "#reservationParentDiv").val() == 'PLR') && productClassName == 'HOME PAGE'){
+				return false;
+			}else{
+				return  true;
+			}
+		}
+	}
+	return false;
+}
+
+function isProposalUnderReview(lineItemId){
+    if ($("#proposalStatus", "#reservationParentDiv").val() == 'REVIEW') {
+        var defaultOptionID = $("#reservedLineItemTable").jqGrid('getCell', lineItemId, 'optionId');
+        if (jQuery("#defaultOption", "#reservationParentDiv").val() == defaultOptionID) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+    return true;
+}
+
+function  updateExpirationDate(lineItemID){
+	var proposalID = jQuery("#proposalID", "#reservationParentDiv").val();
+	var ajaxReq = new AjaxRequest();
+    ajaxReq.url = "./proposalWorkflow/updateReservationsExpiryDate.action?proposalID=" + proposalID +"&lineItemID=" + lineItemID + "&expiryDate=" + $("#renewDate", "#renewExpirationDateContainer").val();
+    ajaxReq.success = function(result, status, xhr){
+    	if (result.validationFailed == true) {
+    		$("#renewDate", "#renewExpirationDateContainer").addClass("errorElement errortip").attr("title", result.errorList[0].errorMessageForUI+ '<BR><b>Help:</b> ' + result.errorList[0].errorHelpMessageForUI);
+			 $("#renewDate", "#renewExpirationDateContainer").qtip({
+		        style: {
+		            classes: 'ui-tooltip-red' 
+		        },
+		        position:{my: 'bottom center',at: 'top center'}
+		    });
+		    $(".ui-dialog-buttonset button:contains('Renew')").button("enable");
+    	}
+		if(result.objectMap.lineItemID){
+			$("#renewExpirationDateContainer").dialog("close");
+			$("#reservedLineItemTable").setCell(lineItemID, "reservationExpiryDate", $("#renewDate", "#renewExpirationDateContainer").val());
+			$("#reservedLineItemTable").setCell(lineItemID, "lastRenewedOn", result.objectMap.lastRenewedOn);
+			$("#renewDate").datepicker("destroy");
+			$("#renewDate", "#renewExpirationDateContainer").qtip("destroy");
+	 		$("#renewDate", "#renewExpirationDateContainer").removeClass("errorElement");
+			jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['message.expiry.date.renew']});
+			if(!showHideRenewBtn(lineItemID) && ($("#proposalOwnerRole", "#reservationParentDiv").val() != 'ADM') && $("#proposalOwnerRole", "#reservationParentDiv").val() != 'POW'){
+				$("#renewExpiryDate"+lineItemID).remove();
+			}
+			$("#" + lineItemID, "#reservedLineItemTable").find("td").removeClass("expire-package");
+		}
+    };
+    ajaxReq.submit();
+}
+
+function moveReservedLineItemsData(lineItemId){
+    var currentOptionID = $("#reservedLineItemTable").jqGrid('getCell', lineItemId , 'optionId');
+	var proposalId = jQuery("#proposalID", "#reservationParentDiv").val();
+    var ajaxReq = new AjaxRequest();
+    ajaxReq.url = "./proposalWorkflow/getProposalReservationOption.action?proposalID=" + proposalId + "&optionID=" + currentOptionID;
+    ajaxReq.dataType = 'html';
+    ajaxReq.success = function(result, status, xhr){
+		$("#moveReservedDataDialogue").empty();
+		$("#errorReservOptionSelect", "div[aria-labelledby=ui-dialog-title-moveReservedDataDialogue]").empty();
+        var selectProposalOption = new ModalDialog();
+        selectProposalOption.width = 500;
+        selectProposalOption.height = 250;
+        selectProposalOption.title = 'Move Reservation Data';
+        selectProposalOption.buttons = [{
+            text: "Move",
+            click: function(){
+                moveReservation();
+            }
+        }, {
+            text: "Close",
+            click: function(){
+                $("#moveReservedDataDialogue").dialog("close");
+            }
+        }];
+        $("#moveReservedDataDialogue").dialog(selectProposalOption);
+		$("#moveReservedDataDialogue").html(result);
+        $("#moveReservedDataDialogue").dialog("open");
+        enableDialogButton("moveReservedDataDialogue");
+		$(".ui-dialog-buttonpane", "div[aria-labelledby=ui-dialog-title-moveReservedDataDialogue]").append("<div id='errorReservOptionSelect' class='model-dialog-error'>" + resourceBundle['error.select.option'] + "</div>");
+        $("#errorReservOptionSelect", "div[aria-labelledby=ui-dialog-title-moveReservedDataDialogue]").hide();
+    };
+    ajaxReq.submit();
+}
+
+function moveReservation(){
+    var gsr = $("#reservedLineItemTable").jqGrid('getGridParam', 'selrow');
+    var lineItemId = $("#reservedLineItemTable").jqGrid('getCell', gsr, 'lineItemID');
+    var proposalId = jQuery("#proposalID", "#reservationParentDiv").val();
+    var newOptionId = "";
+    $('[name=reservedOptionId]:checked', '#reservProposalOptionListing').each(function(){
+        newOptionId = $(this).val();
+    });
+    
+    if (newOptionId == "") {
+         $("#errorReservOptionSelect", "div[aria-labelledby=ui-dialog-title-moveReservedDataDialogue]").show();
+         $(".ui-dialog-buttonset button:contains('Move')").button("enable");
+    } else { 
+        var ajaxReq = new AjaxRequest();
+        ajaxReq.url = './proposalWorkflow/moveReservationData.action?proposalID=' + proposalId + '&optionId=' + newOptionId + "&lineItemId=" + lineItemId;
+        ajaxReq.success = function(result, status, xhr){
+            $("#reservedLineItemTable").trigger("reloadGrid");
+            $(".ui-dialog-buttonset button:contains('Move')").button("enable");
+            $("#moveReservedDataDialogue").dialog("close");
+            jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['reservation.moved.successfully']});
+        };
+        ajaxReq.submit();
+        $(".ui-dialog-buttonset button:contains('Move')").button("disable");
+    }    
+}
+
+function deleteReservedLineItem(lineItemId){
+	var errorObj = resourceBundle['confirm.delelte.reservation']; 	
+	new ModalDialogConfirm(errorObj,lineItemId,deleteReservation);	
+}
+
+function deleteReservation(lineItemId){
+	var proposalId = jQuery("#proposalID", "#reservationParentDiv").val();
+	var ajaxReq = new AjaxRequest();
+    ajaxReq.url = './manageReservation/deleteReservedLineItem.action?lineItemId='+lineItemId+'&proposalId='+proposalId;
+    ajaxReq.success = function(result, status, xhr){
+    	if(result.objectMap.gridKeyColumnValue){
+	        jQuery("#runtimeDialogDiv").model({theme: 'Success', message: resourceBundle['reservation.deleted.successfully']});
+	        $("#reservedLineItemTable").trigger("reloadGrid", [{
+	            page: 1
+	        }]);
+	    } else {
+			jQuery("#runtimeDialogDiv").model({theme: 'Error', autofade: false, message: resourceBundle['reservation.deleted.error']});
+	    }
+    };
+    ajaxReq.submit();    
+}
+
+function createAdminDatePicker(){
+    var months = new Array('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12');
+	$("#renewDate").datepicker({
+        showOn: "both",
+        buttonImage: "./images/calendar.gif",
+        buttonText: "Renew",
+        buttonImageOnly: true,
+        onSelect: function(selectedDate){
+		}
+    });
+    /*var CurrentDate = new Date();
+	var todayDate = months[CurrentDate.getMonth()] + "/" + CurrentDate.getDate() + "/" + CurrentDate.getFullYear();
+
+	if($("#reservationExpiryDate", "#renewExpirationDateContainer").val() <= todayDate){
+		todayDate = months[CurrentDate.getMonth()] + "/" + CurrentDate.getDate() + "/" + CurrentDate.getFullYear();
+	}else{
+		todayDate = $("#reservationExpiryDate", "#renewExpirationDateContainer").val();
+	}
+
+    $("#renewDate", "#renewExpirationDateContainer").datepicker("option", "minDate", todayDate);
+    CurrentDate.setMonth(CurrentDate.getMonth() + 12);
+    $("#renewDate", "#renewExpirationDateContainer").datepicker("option", "maxDate", CurrentDate);*/
+}

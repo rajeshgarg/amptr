@@ -1,0 +1,459 @@
+/**
+ * 
+ */
+package com.nyt.mpt.dao;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import com.nyt.mpt.domain.CampaignObjective;
+import com.nyt.mpt.domain.LineItem;
+import com.nyt.mpt.domain.LineItemExceptions;
+import com.nyt.mpt.domain.LineItemReservations;
+import com.nyt.mpt.domain.LineItemSalesTargetAssoc;
+import com.nyt.mpt.domain.LineItemTarget;
+import com.nyt.mpt.domain.Notes;
+import com.nyt.mpt.domain.Proposal;
+import com.nyt.mpt.domain.ProposalOption;
+import com.nyt.mpt.domain.ProposalVersion;
+import com.nyt.mpt.util.PaginationCriteria;
+import com.nyt.mpt.util.SortingCriteria;
+import com.nyt.mpt.util.enums.ProposalStatus;
+import com.nyt.mpt.util.filter.FilterCriteria;
+import com.nyt.mpt.util.filter.RangeFilterCriteria;
+import com.nyt.mpt.util.reservation.ReservationTO;
+import com.nyt.mpt.util.reservation.SalesCalendarReservationDTO;
+
+/**
+ * @author amandeep.singh
+ *
+ */
+public interface IProposalDAO {
+
+	/**
+	 * Return list of all active package.
+	 *
+	 * @param filterCriteriaLst
+	 * @param pageCriteria
+	 * @param sortCriteria
+	 * @return List<Proposal>
+	 */
+	List<Proposal> getProposalList(List<RangeFilterCriteria> filterCriteriaLst, PaginationCriteria pageCriteria, SortingCriteria sortCriteria);
+
+	/**
+	 * Return total count of proposal in Database
+	 *
+	 * @param filterCriteriaLst
+	 * @return int
+	 */
+
+	int getProposalListCount(List<RangeFilterCriteria> filterCriteriaLst);
+
+   /**
+	 * Save and update Proposal in database
+	 *
+	 * @param proposal
+	 * @return Proposal
+	 */
+	Proposal saveProposal(Proposal proposal);
+	
+	/**
+	 * Add proposal in database
+	 *
+	 * @param proposal
+	 * @return long
+	 */
+	long addProposal(Proposal proposal);
+	
+	/**
+	 * Return Proposal based on proposalId.
+	 *
+	 * @param proposalId
+	 * @return Proposal
+	 */
+	Proposal getProposalbyId(Long proposalId);
+	
+	/**
+	 * Delete lineItemException and return lineItemException Id.
+	 *
+	 * @param lineItemException
+	 * @return Long
+	 */
+	Long deleteLineItemException(LineItemExceptions lineItemExceptions);
+	
+	/**
+	 * Adding LineItems Of Proposal based on lineItem Id
+	 *
+	 * @param proposalLineItem
+	 * @return Long
+	 */
+	Long addLineItemsOfProposal(LineItem proposalLineItem);
+	
+	/**
+	 * Return a list of ProposalLineItemAssoc based on proposalId,
+	 * proposal version, filter, pagination and sorting criteria
+	 *
+	 * @param proposalId
+	 * @param proposalversion
+	 * @param criteria
+	 * @param pgCriteria
+	 * @param sortCriteria
+	 * @return List<ProposalLineItemAssoc>
+	 */
+	List<LineItem> getFilteredProposalLineItems(Long optionId, Long proposalversion, FilterCriteria criteria,
+			PaginationCriteria pgCriteria, SortingCriteria sortCriteria);
+	
+	/**
+	 * Return count of Package line items based on option Id, proposal version and filter criteria.
+	 *
+	 * @param optionId
+	 * @param proposalVersion
+	 * @param filterCriteria
+	 * @return int
+	 */
+	int getFilteredProposalLineItemsCount(Long optionId, Long proposalVersion, FilterCriteria criteria);
+
+	/**
+	 * Return list of Proposal based on elementId.
+	 *
+	 * @param elementId
+	 * @return List<LineItemTarget>
+	 */
+	List<LineItemTarget> getProposalGeoTargets(Long elementId);
+
+	/**
+	 * Return a list of ProposalVersion based on optionId and proposal version.
+	 *
+	 * @param optionId
+	 * @param proposalVersion
+	 * @return List<ProposalVersion>
+	 */
+	List<ProposalVersion> getproposalVersions(long optionId, long proposalVersion);
+	
+	/**
+	 * Method to return ProposalVersion Base on proposalversionId.
+	 *
+	 * @param proposalversionId
+	 * @return ProposalVersion
+	 */
+	ProposalVersion getproposalVersion(long proposalversionId);
+	
+	/**
+	 * Edit lineItem of Proposal based on proposal LineItem.
+	 *
+	 * @param lineItem
+	 * @return Long
+	 */
+	Long editLineItemsOfProposal(LineItem proLineItemDB);
+
+	/**
+	 * Used to delete line item sales target association
+	 *
+	 * @param salesTargetAssoc
+	 * @return
+	 */
+	Long deleteLineItemSalesTargetAssoc(LineItemSalesTargetAssoc lineItemSalesTargetAssoc);
+
+	/**
+	 * Return a list of lineItem based on lineItemId
+	 *
+	 * @param lineItemId
+	 * @return List<LineItem>
+	 */
+	List<LineItem> getLineItems(String lineItemID);
+
+	/**
+	 * Delete Proposal's GeoTargets for lineItemTarget based on Id
+	 *
+	 * @param lineItemTarget
+	 * @return Long
+	 */
+	Long deleteProposalGeoTargets(LineItemTarget lineItemTarget);
+
+	/**
+	 * Returns the ProposalOption based on it's id
+	 * 
+	 * @param optionId
+	 * @return
+	 */
+	ProposalOption getOptionbyId(Long optionId);
+
+	/**
+	 * Updates the proposalOption Object
+	 * 
+	 * @param option
+	 * @return
+	 */
+	ProposalOption saveOption(ProposalOption option);
+
+	/**
+	 * add a new proposalOption Object
+	 * 
+	 * @param option
+	 * @return
+	 */
+	ProposalOption addOption(ProposalOption option);
+
+	/**
+	 * Adds new proposalVersion object
+	 * 
+	 * @param propVersion
+	 * @return
+	 */
+	ProposalVersion addOptionVersion(ProposalVersion propVersion);
+	
+	/**
+	 * Method will return the max sequence no for the proposal Line Item
+	 *
+	 * @param versionId
+	 * @return
+	 */
+	int getMaxSequenceNoForLineItem(long versionId);
+	
+	/**
+	 * Return a list of line Items on base of lineItems .
+	 *
+	 * @param lineItems
+	 * @return List<LineItem>
+	 */
+	List<LineItem> getLineItemsOnBaseOfId(Long[] lineItems);
+	
+	/**
+	 * This method is used to fetch all campaign objectives from database
+	 *
+	 * @return List<CampaignObjective>
+	 */
+	List<CampaignObjective> getCampaignObjectives();
+	
+	/**
+	 * Return list of campaign objectives for a Proposal
+	 *
+	 * @param proposalId
+	 * @return Set<CampaignObjective>
+	 */
+	Set<CampaignObjective> getCampaignObjectivesByProposalId(long proposalId);
+	
+	/**
+	 * Check for proposal with same name based on proposalName and proposalId.
+	 *
+	 * @param proposalName
+	 * @param proposalId
+	 * @return int
+	 */
+	int proposalCountWithSameName(String proposalName, Long proposalId);
+	
+	/**
+	 * Return list of linrItrmException based on lineItem Id.
+	 *
+	 * @param lineItemID
+	 * @return List<LineItemExceptions>
+	 */
+	List<LineItemExceptions> getLineItemExceptions(Long lineItemID);
+	
+	/**
+	 * Updating Proposal Version based on ProposalVersion.
+	 *
+	 * @param proposalversion
+	 * @return Long
+	 */
+	Long updateProposalVersion(ProposalVersion proposalversion);
+	
+	/**
+	 * Returns the line item with the given Id
+	 * @param lineItemId
+	 * @return
+	 */
+	public LineItem getLineItemById(final long lineItemId);
+
+	/**
+	 * Returns a proposal Object without any Option,Version...(Nothing initialized)
+	 * @param proposalId
+	 * @return
+	 */
+	Proposal getProposalForClone(Long proposalId);
+
+	/**
+	 * Returns all active options of a proposal
+	 * @param proposalId
+	 * @return
+	 */
+	List<ProposalOption> getProposalOptionsById(Long proposalId);
+	
+	/**
+	 * Returns the notes object with the given id.
+	 * @param notesId
+	 * @return
+	 */
+	Notes getNotesById(Long notesId);
+	
+	/**
+	 * Saves the new notes.
+	 * @param notes
+	 * @return
+	 */
+	Notes addNotes(final Notes notes);
+	
+	/**
+	 * Updates the existing notes.
+	 * @param notes
+	 * @return
+	 */
+	Notes saveNotes(final Notes notes);
+	
+	/**
+	 * Returns all the notes of a proposal.
+	 * @param proposalId
+	 * @return
+	 */
+	List<Notes> getProposalNotes(final long proposalId);
+	
+	/**
+	 * Returns the list of all proposals having status among statuses in statusLst and whose due date is older than expiryDueDate.
+	 * @return
+	 */
+	List<Proposal> getProposalsForUpdation(Date expiryProposedDate , List<ProposalStatus> statusLst);
+
+	/**
+	 * Deletes Reservation of a Line Item
+	 * @param reservation
+	 * @return
+	 */
+	Long deleteReservation(LineItemReservations reservation);
+
+	/**
+	 * @param calendarVO
+	 * @return
+	 */
+	List<Proposal> getReservedProposalsForCalendar(ReservationTO calendarVO);
+	
+	/**
+	 * @param calendarVO
+	 * @return
+	 */
+	List<Proposal> getProposedProposalsForCalendar(ReservationTO calendarVO);
+	
+	/**
+	 * Get list of reserved line items
+	 * @param proposalId
+	 * @param proposalVersionIdLst
+	 * @param filterCriteria
+	 * @param pgCriteria
+	 * @param sortCriteria
+	 * @return
+	 */
+	List<LineItem> getAllReservedLineItemsForProposal(final Long proposalId, final List<Long> proposalVersionIdLst, final FilterCriteria filterCriteria, final PaginationCriteria pgCriteria, final SortingCriteria sortCriteria);
+	
+	/**
+	 * Get count of reserved line items
+	 * @param proposalId
+	 * @param proposalVersionIdLst
+	 * @return
+	 */
+	int getReservedLineItemsCount(final Long proposalId, final List<Long> proposalVersionIdLst);
+	
+	/**
+	 * Returns the list of AMPT proposals fulfilling the search criteria
+	 * @param criteriaLst
+	 * @return
+	 */
+	List<LineItem> getProposalsForReservationSearch(final List<RangeFilterCriteria> criteriaLst, final PaginationCriteria pgCriteria, final SortingCriteria sortCriteria);
+	
+	/**
+	 * Returns the count of the AMPT proposals fulfilling the search criteria
+	 * @param filterCriteriaLst
+	 * @return
+	 */
+	int getProposalsForReservationSearchCount(final List<RangeFilterCriteria> filterCriteriaLst);
+	
+	/**
+	 * Get reservation data by lineItemID
+	 * @param lineItemID
+	 * @return
+	 */
+	List<LineItemReservations> getReservationBylineItemID(final Long lineItemID);
+
+	 /**
+	 * Update line item reservations data
+	 * @param lineItemReservations
+	 * @return
+	 */
+	LineItemReservations updateLineItemReservations(LineItemReservations lineItemReservations);
+
+	/**
+	 * Returns List of Proposals without anything initialized
+	 * @return
+	 */
+	List<Proposal> getAllProposalList();
+
+	/**
+	 * Return Proposal based on proposalId.
+	 * @param proposalId
+	 * @return
+	 */
+	Proposal getProposalbyIdForSosIntegration(Long proposalId);
+
+	/**
+	 * Returns the qualifying Line Items Price Type
+	 * @return
+	 */
+	Map<String, String> getQualifyingLineItems();
+	
+	/**
+	 * Returns the List of Line items corresponding to the Ids given. 
+	 * @param lineItemId
+	 * @return
+	 */
+	List<LineItem> getLineItemsList(final String lineItemId);
+	
+	/**
+	 * Returns the list of options with the given Ids.
+	 * @param optionIds
+	 * @return
+	 */
+	List<ProposalOption> getOptionLstbyIds(final Long[] optionIds);
+	
+	/**
+	 * Return a list of proposal having lineItem based on filter, pagination and sorting criteria.
+	 * @param criteriaLst
+	 * @param pgCriteria
+	 * @param sortCriteria
+	 * @return List<Proposal>
+	 */
+	List<Proposal> getProposalListHavingLineItems(List<RangeFilterCriteria> criteriaLst, PaginationCriteria pgCriteria,
+			SortingCriteria sortCriteria);
+
+	/**
+	 * @param lineItemIDs
+	 * @return
+	 */
+	List<LineItemReservations> getReservationsBylineItemIDs(List<Long> lineItemIDs);
+
+	/**
+	 * Returns list of proposal by Id
+	 * @param proposalId
+	 * @return
+	 */
+	List<Proposal> getProposalsByID(List<Long> proposalId);
+
+	/**
+	 * Returns the reserved Proposals for sales calendar
+	 * @param calendarVO
+	 * @return
+	 */
+	List<Proposal> getReservedProposalsForSalesCalendar(SalesCalendarReservationDTO calendarVO);
+
+	/**
+	 * Pull Proposed LI from AMPT
+	 * @param calendarVO
+	 */
+	List<Proposal> getProposedReservationsForCalendar(SalesCalendarReservationDTO calendarVO);
+
+	/**
+	 * Return a list of lineItems in vulnerable state having given product class Id.
+	 * @param productClassId
+	 * @return
+	 */
+   List<LineItem> getVulnerableHomepageReservations(Long productClassId);
+}
